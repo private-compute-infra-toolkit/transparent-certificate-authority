@@ -22,7 +22,7 @@ rust_static_library(
     srcs = ["src/interface.rs"],
     deps = [
         "@crates//:cxx",
-        "@oak//oak_attestation_verification",
+        "@oak//oak_attestation_verification:oak_attestation_verification_with_regex",
         "@oak//oak_attestation_verification_types",
         "@oak//oak_proto_rust",
         "@oak//oak_time",

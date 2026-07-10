@@ -24,11 +24,11 @@ import java.time.Instant;
 
 public class GoldenRequest {
   Instant getNotBefore() {
-    return Instant.parse("2026-05-06T08:18:08.373000Z");
+    return Instant.parse("2026-06-25T14:52:25.941000Z");
   }
 
   Instant getNotAfter() {
-    return Instant.parse("2026-08-04T08:18:08.373000Z");
+    return Instant.parse("2026-09-22T12:53:03.582000Z");
   }
 
   public IssueCertificateRequest getRequestBody() throws Exception {

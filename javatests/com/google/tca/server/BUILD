@@ -254,3 +254,18 @@ java_test(
         "@pcit_mbs//java/com/google/mbs:certmanagement",
     ],
 )
+
+java_test(
+    name = "CertificateValidityReporterTest",
+    size = "small",
+    srcs = ["CertificateValidityReporterTest.java"],
+    deps = [
+        "//java/com/google/tca/domain",
+        "//java/com/google/tca/domain/metric",
+        "//java/com/google/tca/server",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)

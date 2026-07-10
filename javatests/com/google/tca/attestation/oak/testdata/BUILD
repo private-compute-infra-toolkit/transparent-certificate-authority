@@ -32,5 +32,7 @@ filegroup(
         "certificate_signing_request.pem",
         "manual_oak_attestation_evidence.textproto",
         "manual_oak_reference_values.textproto",
+        "manual_oak_reference_values_regex.textproto",
+        "manual_oak_reference_values_regex_mismatch.textproto",
     ],
 )

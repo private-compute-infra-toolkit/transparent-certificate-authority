@@ -36,8 +36,14 @@
             {
               "source_labels": ["job"],
               "label_matcher": "^tca$",
-              "dimensions": [["event"]],
-              "metric_selectors": ["^tca_mbsEvent_total$"]
+              "dimensions": [["status"]],
+              "metric_selectors": ["^tca_mbsStatus$"]
+            },
+            {
+              "source_labels": ["job"],
+              "label_matcher": "^tca$",
+              "dimensions": [[]],
+              "metric_selectors": ["^tca_root_certificate_validity_seconds$"]
             }
           ]
         }

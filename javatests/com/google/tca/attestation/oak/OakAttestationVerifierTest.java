@@ -80,6 +80,28 @@ public class OakAttestationVerifierTest {
     assertThrows(ClassCastException.class, () -> verifier.verify(wrongEvidence, null, rv));
   }
 
+  @Test
+  public void testOakVerifier_verifyEvidence_successful_withRegex() throws Exception {
+    OakAttestationVerifier verifier = createVerifier();
+    OakAttestationEvidence evidence = loadEvidence("manual_oak_attestation_evidence.textproto");
+    PublicKey claimedPublicKey = loadPublicKeyFromCsr("certificate_signing_request.pem");
+    ReferenceValues rv = getReferenceValues("manual_oak_reference_values_regex.textproto");
+
+    boolean result = verifier.verify(evidence, claimedPublicKey, rv);
+    assertThat(result).isTrue();
+  }
+
+  @Test
+  public void testOakVerifier_verifyEvidence_failed_withRegexMismatch() throws Exception {
+    OakAttestationVerifier verifier = createVerifier();
+    OakAttestationEvidence evidence = loadEvidence("manual_oak_attestation_evidence.textproto");
+    PublicKey claimedPublicKey = loadPublicKeyFromCsr("certificate_signing_request.pem");
+    ReferenceValues rv = getReferenceValues("manual_oak_reference_values_regex_mismatch.textproto");
+
+    boolean result = verifier.verify(evidence, claimedPublicKey, rv);
+    assertThat(result).isFalse();
+  }
+
   private OakAttestationVerifier createVerifier() {
     return new OakAttestationVerifier(new OakEvidenceVerifier(), new DefaultTimeProvider());
   }
@@ -112,7 +134,11 @@ public class OakAttestationVerifierTest {
   }
 
   private ReferenceValues getReferenceValues() throws IOException {
-    ByteString raw_rv = loadReferenceValues("manual_oak_reference_values.textproto").toByteString();
+    return getReferenceValues("manual_oak_reference_values.textproto");
+  }
+
+  private ReferenceValues getReferenceValues(String filename) throws IOException {
+    ByteString raw_rv = loadReferenceValues(filename).toByteString();
     return new ReferenceValues(ReferenceValuesType.OAK, raw_rv);
   }
 

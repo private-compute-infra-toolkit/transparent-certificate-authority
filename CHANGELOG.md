@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.6.0 (2026-07-10)
+
+
+### Dependencies
+
+* **deps:** Update DevKit to release-3.10.0
+
+
+### Features
+
+* Change MBS metrics from counter to gauge
+* Expose main certificate validity metric
+* Remove support for legacy claim types
+* Rename main certificate to root certificate in metrics
+* Update root cert validity to 180 days
+* use regex Oak verifier
+
 ## 0.5.0 (2026-06-30)
 
 

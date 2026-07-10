@@ -95,7 +95,7 @@ public class LocalModeModule extends AbstractModule {
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
                 new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
                 new X500Name("CN=TCA Local"),
-                Duration.ofDays(120),
+                Duration.ofDays(180),
                 Optional.of(
                     new GeneralNames(
                         new GeneralName(

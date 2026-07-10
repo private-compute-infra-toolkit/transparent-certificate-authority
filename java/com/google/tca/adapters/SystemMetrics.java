@@ -22,11 +22,16 @@ import com.google.tca.domain.metric.Metrics;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Singleton
 public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
@@ -38,9 +43,11 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
   private final PrometheusMeterRegistry registry;
   private final Counter[] authenticationCounter;
   private final Counter[] processingCounter;
-  private final Counter[] mbsEventCounter;
+  private final AtomicInteger[] mbsStatusValues;
   private final Set<String> approvedClients = ConcurrentHashMap.newKeySet();
   private final ConcurrentHashMap<String, Counter> issuanceCounters = new ConcurrentHashMap<>();
+  private final AtomicLong rootCertificateValiditySeconds = new AtomicLong(0);
+  private final AtomicBoolean rootCertificateValiditySecondsRegistered = new AtomicBoolean(false);
 
   @Inject
   public SystemMetrics(PrometheusMeterRegistry registry) {
@@ -49,7 +56,7 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
         createCounters(PREFIX + "authenticationStatus", "status", Status.class);
     this.processingCounter =
         createCounters(PREFIX + "processingStatus", "status", ProcessingStatus.class);
-    this.mbsEventCounter = createCounters(PREFIX + "mbsEvent", "event", MbsEvent.class);
+    this.mbsStatusValues = createGauges(PREFIX + "mbsStatus", "status", MbsEvent.class);
   }
 
   private <E extends Enum<E>> Counter[] createCounters(
@@ -62,6 +69,20 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
               .tag(tagKey, item.name().toLowerCase())
               .description("Metrics tracking for " + name)
               .register(registry);
+    }
+    return array;
+  }
+
+  private <E extends Enum<E>> AtomicInteger[] createGauges(
+      String name, String tagKey, Class<E> enumClass) {
+    E[] constants = enumClass.getEnumConstants();
+    AtomicInteger[] array = new AtomicInteger[constants.length];
+    for (E item : constants) {
+      array[item.ordinal()] = new AtomicInteger(0);
+      Gauge.builder(name, array[item.ordinal()], AtomicInteger::get)
+          .tag(tagKey, item.name().toLowerCase())
+          .description("Metrics tracking for " + name)
+          .register(registry);
     }
     return array;
   }
@@ -117,7 +138,22 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
   @Override
   public void recordEvent(MbsEvent event) {
     if (event != null) {
-      mbsEventCounter[event.ordinal()].increment();
+      for (MbsEvent e : MbsEvent.class.getEnumConstants()) {
+        mbsStatusValues[e.ordinal()].set(e == event ? 1 : 0);
+      }
+    }
+  }
+
+  @Override
+  public void setRootCertificateValidity(Duration remaining) {
+    rootCertificateValiditySeconds.set(remaining.toSeconds());
+    if (rootCertificateValiditySecondsRegistered.compareAndSet(false, true)) {
+      Gauge.builder(
+              PREFIX + "root_certificate_validity_seconds",
+              rootCertificateValiditySeconds,
+              AtomicLong::get)
+          .description("Seconds remaining until the root certificate expires")
+          .register(registry);
     }
   }
 }

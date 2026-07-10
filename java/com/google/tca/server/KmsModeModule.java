@@ -114,7 +114,7 @@ public class KmsModeModule extends AbstractModule {
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
             new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
             new X500Name("C=US, O=Google LLC, CN=TCA Root"),
-            Duration.ofDays(120),
+            Duration.ofDays(180),
             san,
             KeyUsage.keyCertSign),
         metrics);

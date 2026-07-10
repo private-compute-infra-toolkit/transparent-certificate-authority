@@ -46,6 +46,7 @@ java_library(
     srcs = [
         "AwsResourceNames.java",
         "AwsResourceNamesProvider.java",
+        "CertificateValidityReporter.java",
         "ImdsClient.java",
         "JwtAuth.java",
         "JwtInterceptor.java",

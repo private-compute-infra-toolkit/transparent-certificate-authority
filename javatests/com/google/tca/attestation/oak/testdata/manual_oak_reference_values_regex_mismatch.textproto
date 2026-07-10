@@ -1,0 +1,74 @@
+# proto-file: bazel-tca/external/oak+/proto/attestation/reference_value.proto
+# proto-message: oak.attestation.v1.ReferenceValues
+#
+
+oak_containers {
+  root_layer { insecure { } }
+  kernel_layer {
+    kernel {
+      digests {
+        image {
+          digests {
+            sha2_256: "\371\320XBG\264l\3024\250b\252\214\320\207e\263\204\005\002\"S\247\213\232\361\211\304\316\333\344G"
+          }
+        }
+        setup_data {
+          digests {
+            sha2_256: "Z\\\324+\224q\252\337\226\334-$\a\331\334\273\021e\302\214~\352\032\vN\234r\317\006#\273\272"
+          }
+        }
+      }
+    }
+    kernel_cmd_line_text {
+      regex {
+        value: "^ console=ttyS0 panic=-1 brd.rd_nr=1 brd.rd_size=3000000 brd.max_part=1 ip=10.0.2.15:::255.255.255.0::eth0:off loglevel=7 -- --launcher-addr=vsock://999:999$"
+      }
+    }
+    init_ram_fs {
+      digests {
+        digests {
+          sha2_256: "\322\275:\223\3145\t\345\347\026\215\250^\361\355\301g\240\325\2409\":.2FD5$\336\214\236"
+        }
+      }
+    }
+    memory_map {
+      digests {
+        digests {
+          sha2_256: "\260\300\244\fS\023FL\\P\177a\213\354\251\253\275L\353\230\251\2047|q\226\203  H\205\260"
+        }
+      }
+    }
+    acpi {
+      digests {
+        digests {
+          sha2_256: "Y\266b<*\036\021\312\320\177\021\177\264\341\n\234\274Z\355\365\255\212\364\347\242\217\313\f\350\253\343k"
+        }
+      }
+    }
+  }
+  system_layer {
+    system_image {
+      digests {
+        digests {
+          sha2_256: "\264\3222K\032c\335\202t\367 \321,+\017c\214\376yd\214*\273oK\016\210\035=\"\343\233"
+        }
+      }
+    }
+  }
+  container_layer {
+    binary {
+      digests {
+        digests {
+          sha2_256: "\354\vj\370\025\317\343\226\361\265\234I1\316\ad!^6\247\315\260-\351\326X\002\a2\2221\311"
+        }
+      }
+    }
+    configuration {
+      digests {
+        digests {
+          sha2_256: "\343\260\304B\230\374\034\024\232\373\364\310\231o\271$\'\256A\344d\233\223L\244\225\231\033xR\270U"
+        }
+      }
+    }
+  }
+}

@@ -22,6 +22,7 @@ import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import java.time.Duration;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -145,5 +146,20 @@ public class SystemMetricsTest {
     systemMetrics.incrementCertificateIssuanceCounter("client-1000");
     assertThat(registry.find("tca.certificateIssuance").tag("client_id", "client-1000").counter())
         .isNull();
+  }
+
+  @Test
+  public void setRootCertificateValidity_registersGaugeOnFirstCall() {
+    assertThat(registry.find("tca.root_certificate_validity_seconds").gauge()).isNull();
+
+    systemMetrics.setRootCertificateValidity(Duration.ofMinutes(5));
+
+    io.micrometer.core.instrument.Gauge gauge =
+        registry.get("tca.root_certificate_validity_seconds").gauge();
+    assertThat(gauge).isNotNull();
+    assertThat(gauge.value()).isEqualTo(300.0);
+
+    systemMetrics.setRootCertificateValidity(Duration.ofMinutes(10));
+    assertThat(gauge.value()).isEqualTo(600.0);
   }
 }

@@ -71,6 +71,9 @@ public class ServerMain {
         injector.getInstance(TrustedCertificateAuthorityGrpcHandler.class);
     JwtInterceptor jwtInterceptor = injector.getInstance(JwtInterceptor.class);
     PrometheusMeterRegistry meterRegistry = injector.getInstance(PrometheusMeterRegistry.class);
+    CertificateValidityReporter validityReporter =
+        injector.getInstance(CertificateValidityReporter.class);
+    validityReporter.startAsync();
 
     int port = 50051;
     TcaServer tcaServer =
@@ -85,6 +88,7 @@ public class ServerMain {
               public void run() {
                 System.err.println("*** shutting down Armeria server since JVM is shutting down");
                 tcaServer.stop().join();
+                validityReporter.stopAsync();
                 System.err.println("*** server shut down");
               }
             });

@@ -86,15 +86,15 @@ fn verify_attestation_inner(
         .context("extracting root layer from evidence")?;
 
     let verifier: Box<dyn AttestationVerifier> = match root_layer.platform() {
-        TeePlatform::AmdSevSnp => Box::new(oak_attestation_verification::create_amd_verifier(
+        TeePlatform::AmdSevSnp => Box::new(oak_attestation_verification_with_regex::create_amd_verifier(
             clock,
             &reference_values,
         )?),
-        TeePlatform::IntelTdx => Box::new(oak_attestation_verification::create_intel_tdx_verifier(
+        TeePlatform::IntelTdx => Box::new(oak_attestation_verification_with_regex::create_intel_tdx_verifier(
             clock,
             &reference_values,
         )?),
-        TeePlatform::None => Box::new(oak_attestation_verification::create_insecure_verifier(
+        TeePlatform::None => Box::new(oak_attestation_verification_with_regex::create_insecure_verifier(
             clock,
             &reference_values,
         )?),
