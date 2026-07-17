@@ -36,6 +36,7 @@ import com.google.tlog.TransparencyLogClient;
 import jakarta.inject.Singleton;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -114,7 +115,7 @@ public class KmsModeModule extends AbstractModule {
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
             new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
             new X500Name("C=US, O=Google LLC, CN=TCA Root"),
-            Duration.ofDays(180),
+            Duration.between(Instant.now(), Instant.parse("2027-02-01T00:00:00Z")),
             san,
             KeyUsage.keyCertSign),
         metrics);
