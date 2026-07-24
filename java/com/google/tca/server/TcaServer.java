@@ -25,7 +25,7 @@ import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.grpc.GrpcMeterIdPrefixFunction;
-import com.linecorp.armeria.server.DecoratingHttpServiceFunction;
+import com.linecorp.armeria.server.HttpService;
 import com.linecorp.armeria.server.Server;
 import com.linecorp.armeria.server.ServiceRequestContext;
 import com.linecorp.armeria.server.grpc.GrpcService;
@@ -39,6 +39,7 @@ import io.grpc.protobuf.services.ProtoReflectionService;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /** An Armeria server that hosts the TransparentCaService with gRPC and REST support. */
 public class TcaServer {
@@ -76,7 +77,8 @@ public class TcaServer {
             .blockingTaskExecutor(100)
             .service(
                 grpcService,
-                MetricCollectingService.newDecorator(GrpcMeterIdPrefixFunction.of("tca.server")))
+                MetricCollectingService.newDecorator(GrpcMeterIdPrefixFunction.of("tca.server")),
+                createErrorLoggingDecorator())
             .service(
                 "/healthz",
                 (ctx, req) -> {
@@ -87,29 +89,29 @@ public class TcaServer {
                 })
             .service(
                 "/metrics", PrometheusExpositionService.of(meterRegistry.getPrometheusRegistry()))
-            .decorator(createErrorLoggingDecorator())
             .decorator(LoggingService.newDecorator())
             .build();
   }
 
-  private static DecoratingHttpServiceFunction createErrorLoggingDecorator() {
-    return (delegate, ctx, req) ->
-        HttpResponse.from(
-            req.aggregate()
-                .thenApply(
-                    aggregatedReq -> {
-                      try {
-                        HttpResponse res = delegate.serve(ctx, aggregatedReq.toHttpRequest());
-                        return HttpResponse.from(
-                            res.aggregate()
-                                .handle(
-                                    (aggregatedRes, cause) ->
-                                        handleResponseAndLogOnError(
-                                            ctx, aggregatedReq, aggregatedRes, cause)));
-                      } catch (Exception e) {
-                        return HttpResponse.ofFailure(e);
-                      }
-                    }));
+  private static Function<HttpService, HttpService> createErrorLoggingDecorator() {
+    return delegate ->
+        (ctx, req) ->
+            HttpResponse.from(
+                req.aggregate()
+                    .thenApply(
+                        aggregatedReq -> {
+                          try {
+                            HttpResponse res = delegate.serve(ctx, aggregatedReq.toHttpRequest());
+                            return HttpResponse.from(
+                                res.aggregate()
+                                    .handle(
+                                        (aggregatedRes, cause) ->
+                                            handleResponseAndLogOnError(
+                                                ctx, aggregatedReq, aggregatedRes, cause)));
+                          } catch (Exception e) {
+                            return HttpResponse.ofFailure(e);
+                          }
+                        }));
   }
 
   private static HttpResponse handleResponseAndLogOnError(

@@ -22,6 +22,7 @@ import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.FluentLogger;
+import com.google.tca.domain.metric.Metrics;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
@@ -64,6 +65,7 @@ public class OidcJwksKeyFetcher {
 
   private final JwksUriProvider jwksUriProvider;
   private final InstantSource instantSource;
+  private final Metrics metrics;
   private final LoadingCache<String, JwksData> cache;
 
   /**
@@ -78,11 +80,13 @@ public class OidcJwksKeyFetcher {
       JwksUriProvider jwksUriProvider,
       InstantSource instantSource,
       HttpClient httpClient,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      Metrics metrics) {
     this.jwksUriProvider = jwksUriProvider;
     this.instantSource = instantSource;
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
+    this.metrics = metrics;
     this.cache =
         Caffeine.newBuilder()
             .ticker(() -> TimeUnit.MILLISECONDS.toNanos(instantSource.millis()))
@@ -98,6 +102,7 @@ public class OidcJwksKeyFetcher {
    *     is not found.
    */
   public Optional<Key> getKey(String keyId) {
+    metrics.recordOidcJwksLookup();
     JwksData data = cache.get(CACHE_KEY);
     Key key = data.keys.get(keyId);
     if (key != null) {
@@ -114,7 +119,6 @@ public class OidcJwksKeyFetcher {
       data = cache.get(CACHE_KEY);
       return Optional.ofNullable(data.keys().get(keyId));
     }
-
     return Optional.empty();
   }
 
@@ -124,6 +128,8 @@ public class OidcJwksKeyFetcher {
   }
 
   private JwksData fetchJwks() {
+    metrics.recordOidcJwksMiss();
+    long startTimeNanos = System.nanoTime();
     try {
       String jwksUri = jwksUriProvider.getJwksUri();
       HttpRequest request =
@@ -142,6 +148,8 @@ public class OidcJwksKeyFetcher {
           parseKeys(jwksResponse), maxAgeSecs, Instant.ofEpochMilli(instantSource.millis()));
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException("Failed to fetch or parse JWKS", e);
+    } finally {
+      metrics.recordOidcJwksFetchTime(Duration.ofNanos(System.nanoTime() - startTimeNanos));
     }
   }
 

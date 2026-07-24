@@ -412,7 +412,10 @@ public class FullIntegrationTest {
     AggregatedHttpResponse res = httpClient.get("/metrics").aggregate().join();
     assertThat(res.status()).isEqualTo(HttpStatus.OK);
     assertThat(res.contentUtf8()).contains("armeria_server_connections");
-    System.out.println(res.contentUtf8());
+    assertThat(res.contentUtf8()).contains("jvm_memory_used_bytes");
+    assertThat(res.contentUtf8()).contains("jvm_threads_live_threads");
+    assertThat(res.contentUtf8()).contains("process_cpu_usage");
+    assertThat(res.contentUtf8()).contains("system_cpu_usage");
   }
 
   @Test

@@ -18,11 +18,14 @@ package com.google.tca.adapters;
 
 import com.google.common.flogger.FluentLogger;
 import com.google.mbs.Metrics.MbsEvent;
+import com.google.tca.domain.metric.IssuanceSubOperation;
+import com.google.tca.domain.metric.JwksCacheResult;
 import com.google.tca.domain.metric.Metrics;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -48,6 +51,9 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
   private final ConcurrentHashMap<String, Counter> issuanceCounters = new ConcurrentHashMap<>();
   private final AtomicLong rootCertificateValiditySeconds = new AtomicLong(0);
   private final AtomicBoolean rootCertificateValiditySecondsRegistered = new AtomicBoolean(false);
+  private final Counter[] jwksCacheLookupCounter;
+  private final Timer jwksFetchTimer;
+  private final Timer[] subOperationTimers;
 
   @Inject
   public SystemMetrics(PrometheusMeterRegistry registry) {
@@ -57,34 +63,14 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
     this.processingCounter =
         createCounters(PREFIX + "processingStatus", "status", ProcessingStatus.class);
     this.mbsStatusValues = createGauges(PREFIX + "mbsStatus", "status", MbsEvent.class);
-  }
-
-  private <E extends Enum<E>> Counter[] createCounters(
-      String name, String tagKey, Class<E> enumClass) {
-    E[] constants = enumClass.getEnumConstants();
-    Counter[] array = new Counter[constants.length];
-    for (E item : constants) {
-      array[item.ordinal()] =
-          Counter.builder(name)
-              .tag(tagKey, item.name().toLowerCase())
-              .description("Metrics tracking for " + name)
-              .register(registry);
-    }
-    return array;
-  }
-
-  private <E extends Enum<E>> AtomicInteger[] createGauges(
-      String name, String tagKey, Class<E> enumClass) {
-    E[] constants = enumClass.getEnumConstants();
-    AtomicInteger[] array = new AtomicInteger[constants.length];
-    for (E item : constants) {
-      array[item.ordinal()] = new AtomicInteger(0);
-      Gauge.builder(name, array[item.ordinal()], AtomicInteger::get)
-          .tag(tagKey, item.name().toLowerCase())
-          .description("Metrics tracking for " + name)
-          .register(registry);
-    }
-    return array;
+    this.jwksCacheLookupCounter =
+        createCounters(PREFIX + "oidc_jwks_cache_lookups", "result", JwksCacheResult.class);
+    this.jwksFetchTimer =
+        Timer.builder(PREFIX + "oidc_jwks_fetch_time")
+            .description("Time spent fetching OIDC JWKS keys")
+            .register(registry);
+    this.subOperationTimers =
+        createTimers(PREFIX + "issuance_operation_time", "operation", IssuanceSubOperation.class);
   }
 
   @Override
@@ -155,5 +141,86 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
           .description("Seconds remaining until the root certificate expires")
           .register(registry);
     }
+  }
+
+  @Override
+  public void recordOidcJwksLookup() {
+    jwksCacheLookupCounter[JwksCacheResult.TOTAL.ordinal()].increment();
+  }
+
+  @Override
+  public void recordOidcJwksMiss() {
+    jwksCacheLookupCounter[JwksCacheResult.MISS.ordinal()].increment();
+  }
+
+  @Override
+  public void recordOidcJwksFetchTime(Duration duration) {
+    if (duration != null) {
+      jwksFetchTimer.record(duration);
+    }
+  }
+
+  @Override
+  public void recordIssuanceSubOperationTime(IssuanceSubOperation operation, Duration duration) {
+    if (operation != null && duration != null) {
+      subOperationTimers[operation.ordinal()].record(duration);
+    }
+  }
+
+  @Override
+  public IssuanceTimer startIssuanceTimer() {
+    return new IssuanceTimerImpl();
+  }
+
+  private class IssuanceTimerImpl implements IssuanceTimer {
+    private long subOpStartNano = System.nanoTime();
+
+    @Override
+    public void recordSubOperationAndResetTimer(IssuanceSubOperation operation) {
+      long now = System.nanoTime();
+      recordIssuanceSubOperationTime(operation, Duration.ofNanos(now - subOpStartNano));
+      subOpStartNano = now;
+    }
+  }
+
+  private <E extends Enum<E>> Counter[] createCounters(
+      String name, String tagKey, Class<E> enumClass) {
+    E[] constants = enumClass.getEnumConstants();
+    Counter[] array = new Counter[constants.length];
+    for (E item : constants) {
+      array[item.ordinal()] =
+          Counter.builder(name)
+              .tag(tagKey, item.name().toLowerCase())
+              .description("Metrics tracking for " + name)
+              .register(registry);
+    }
+    return array;
+  }
+
+  private <E extends Enum<E>> AtomicInteger[] createGauges(
+      String name, String tagKey, Class<E> enumClass) {
+    E[] constants = enumClass.getEnumConstants();
+    AtomicInteger[] array = new AtomicInteger[constants.length];
+    for (E item : constants) {
+      array[item.ordinal()] = new AtomicInteger(0);
+      Gauge.builder(name, array[item.ordinal()], AtomicInteger::get)
+          .tag(tagKey, item.name().toLowerCase())
+          .description("Metrics tracking for " + name)
+          .register(registry);
+    }
+    return array;
+  }
+
+  private <E extends Enum<E>> Timer[] createTimers(String name, String tagKey, Class<E> enumClass) {
+    E[] constants = enumClass.getEnumConstants();
+    Timer[] array = new Timer[constants.length];
+    for (E item : constants) {
+      array[item.ordinal()] =
+          Timer.builder(name)
+              .tag(tagKey, item.name().toLowerCase())
+              .description("Metrics tracking for " + name)
+              .register(registry);
+    }
+    return array;
   }
 }

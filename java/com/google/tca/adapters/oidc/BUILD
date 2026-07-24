@@ -30,6 +30,7 @@ java_library(
     ],
     deps = [
         "//java/com/google/tca/domain",
+        "//java/com/google/tca/domain/metric",
         "//java/com/google/tca/server:metadata",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_github_ben_manes_caffeine_caffeine",

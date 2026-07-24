@@ -24,6 +24,15 @@
             {
               "source_labels": ["job"],
               "label_matcher": "^tca$",
+              "dimensions": [["operation"]],
+              "metric_selectors": [
+                "^tca_issuance_operation_time_seconds_count$",
+                "^tca_issuance_operation_time_seconds_sum$"
+              ]
+            },
+            {
+              "source_labels": ["job"],
+              "label_matcher": "^tca$",
               "dimensions": [["status"]],
               "metric_selectors": ["^tca_authenticationStatus_total$", "^tca_processingStatus_total$"]
             },
@@ -42,8 +51,22 @@
             {
               "source_labels": ["job"],
               "label_matcher": "^tca$",
+              "dimensions": [["result"]],
+              "metric_selectors": ["^tca_oidc_jwks_cache_lookups_total$"]
+            },
+            {
+              "source_labels": ["job"],
+              "label_matcher": "^tca$",
               "dimensions": [[]],
-              "metric_selectors": ["^tca_root_certificate_validity_seconds$"]
+              "metric_selectors": [
+                "^tca_root_certificate_validity_seconds$",
+                "^tca_oidc_jwks_fetch_time_seconds_count$",
+                "^tca_oidc_jwks_fetch_time_seconds_sum$",
+                "^jvm_memory_used_bytes$",
+                "^jvm_threads_live_threads$",
+                "^process_cpu_usage$",
+                "^system_cpu_usage$"
+              ]
             }
           ]
         }

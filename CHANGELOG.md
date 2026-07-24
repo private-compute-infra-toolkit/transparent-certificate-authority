@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.8.0 (2026-07-24)
+
+
+### Features
+
+* Bypass global request aggregation decorator for /healthz route
+* **metrics:** add OIDC and issuance sub-operation timing metrics
+* **metrics:** add standard JVM, thread, and processor metrics
+* Update root certificate validity to expire on 2027-02-02
+
+
+### Documentation
+
+* Rework README.md to a compehesive project overwiev
+
 ## 0.7.0 (2026-07-17)
 
 

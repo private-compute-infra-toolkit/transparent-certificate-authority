@@ -18,6 +18,13 @@ package com.google.tca.domain;
 
 import static com.google.common.collect.Comparators.max;
 import static com.google.common.collect.Comparators.min;
+import static com.google.tca.domain.metric.IssuanceSubOperation.ENDORSEMENT_METADATA_PARSING;
+import static com.google.tca.domain.metric.IssuanceSubOperation.EXTRACT_PUBLIC_KEY;
+import static com.google.tca.domain.metric.IssuanceSubOperation.POLICY_RESOLUTION;
+import static com.google.tca.domain.metric.IssuanceSubOperation.SIGN_CERTIFICATE;
+import static com.google.tca.domain.metric.IssuanceSubOperation.VALIDATE_AUDIENCE;
+import static com.google.tca.domain.metric.IssuanceSubOperation.VERIFIER_RESOLUTION;
+import static com.google.tca.domain.metric.IssuanceSubOperation.VERIFY_ATTESTATION;
 import static com.google.tca.domain.metric.ProcessingStatus.AUDIENCE_MISMATCH;
 import static com.google.tca.domain.metric.ProcessingStatus.INCORRECT_CERTIFICATE_VALIDITY;
 import static com.google.tca.domain.metric.ProcessingStatus.INVALID_ATTESTATION_TOKEN;
@@ -96,12 +103,15 @@ public class TransparentCaService {
   public List<X509Certificate> issueCertificate(
       CertificateIssuanceRequest request, CallerIdentity callerIdentity)
       throws java.io.IOException, CertificateException {
+    Metrics.IssuanceTimer timer = metrics.startIssuanceTimer();
     PublicKey csrPublicKey;
     try {
       csrPublicKey = extractPublicKey(request);
     } catch (java.io.IOException e) {
       metrics.incrementProcessingCounter(INVALID_CSR);
       throw e;
+    } finally {
+      timer.recordSubOperationAndResetTimer(EXTRACT_PUBLIC_KEY);
     }
 
     try {
@@ -109,12 +119,16 @@ public class TransparentCaService {
     } catch (AudienceValidationException e) {
       metrics.incrementProcessingCounter(AUDIENCE_MISMATCH);
       throw e;
+    } finally {
+      timer.recordSubOperationAndResetTimer(VALIDATE_AUDIENCE);
     }
 
     AttestationEvidence evidence = request.getAttestationEvidence();
     EndorsementAnnotations annotations =
         endorsementMetadataProvider.getAnnotations(evidence.getRawBinaryEndorsement());
     Validity validity = endorsementMetadataProvider.getValidity(evidence.getRawBinaryEndorsement());
+    timer.recordSubOperationAndResetTimer(ENDORSEMENT_METADATA_PARSING);
+
     Optional<Policy> policyOpt =
         policyProvider.getPolicy(
             callerIdentity, annotations.publisherId(), annotations.workloadId());
@@ -127,6 +141,7 @@ public class TransparentCaService {
               callerIdentity.getClientId(), annotations.publisherId(), annotations.workloadId()));
     }
     Policy policy = policyOpt.get();
+    timer.recordSubOperationAndResetTimer(POLICY_RESOLUTION);
 
     Optional<AttestationVerifier> verifierOpt = verifierProvider.getVerifier(evidence);
     if (verifierOpt.isEmpty()) {
@@ -134,11 +149,13 @@ public class TransparentCaService {
       throw new IllegalArgumentException("Unsupported attestation platform");
     }
     AttestationVerifier verifier = verifierOpt.get();
+    timer.recordSubOperationAndResetTimer(VERIFIER_RESOLUTION);
 
     boolean hasBeenVerified =
         policy.referenceValuesList().stream()
             .filter(rv -> rv.type() == evidence.getReferenceValuesType())
             .anyMatch(rv -> verifier.verify(evidence, csrPublicKey, rv));
+    timer.recordSubOperationAndResetTimer(VERIFY_ATTESTATION);
 
     if (!hasBeenVerified) {
       metrics.incrementProcessingCounter(INVALID_ATTESTATION_TOKEN);
@@ -171,7 +188,10 @@ public class TransparentCaService {
     } catch (CertificateException e) {
       metrics.incrementProcessingCounter(SIGNING_ERROR);
       throw e;
+    } finally {
+      timer.recordSubOperationAndResetTimer(SIGN_CERTIFICATE);
     }
+
     metrics.incrementProcessingCounter(SUCCESS);
     metrics.incrementCertificateIssuanceCounter(callerIdentity.getClientId());
     return List.of(signedCertificate, rootCertificate);

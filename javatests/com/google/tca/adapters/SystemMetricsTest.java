@@ -18,11 +18,14 @@ package com.google.tca.adapters;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.tca.domain.metric.IssuanceSubOperation;
+import com.google.tca.domain.metric.JwksCacheResult;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -60,6 +63,26 @@ public class SystemMetricsTest {
               .counter()
               .count();
       assertThat(value).isEqualTo(0.0);
+    }
+
+    for (JwksCacheResult result : JwksCacheResult.values()) {
+      double value =
+          registry
+              .get("tca.oidc_jwks_cache_lookups")
+              .tag("result", result.name().toLowerCase())
+              .counter()
+              .count();
+      assertThat(value).isEqualTo(0.0);
+    }
+
+    for (IssuanceSubOperation op : IssuanceSubOperation.values()) {
+      double count =
+          registry
+              .get("tca.issuance_operation_time")
+              .tag("operation", op.name().toLowerCase())
+              .timer()
+              .count();
+      assertThat(count).isEqualTo(0.0);
     }
   }
 
@@ -161,5 +184,54 @@ public class SystemMetricsTest {
 
     systemMetrics.setRootCertificateValidity(Duration.ofMinutes(10));
     assertThat(gauge.value()).isEqualTo(600.0);
+  }
+
+  @Test
+  public void recordOidcJwksLookupAndMiss_succeeds() {
+    systemMetrics.recordOidcJwksLookup();
+    systemMetrics.recordOidcJwksLookup();
+    systemMetrics.recordOidcJwksMiss();
+
+    double totalVal =
+        registry.get("tca.oidc_jwks_cache_lookups").tag("result", "total").counter().count();
+    double missVal =
+        registry.get("tca.oidc_jwks_cache_lookups").tag("result", "miss").counter().count();
+
+    assertThat(totalVal).isEqualTo(2.0);
+    assertThat(missVal).isEqualTo(1.0);
+  }
+
+  @Test
+  public void recordOidcJwksFetchTime_succeeds() {
+    systemMetrics.recordOidcJwksFetchTime(Duration.ofMillis(150));
+
+    double count = registry.get("tca.oidc_jwks_fetch_time").timer().count();
+    double totalTimeSecs =
+        registry.get("tca.oidc_jwks_fetch_time").timer().totalTime(TimeUnit.SECONDS);
+
+    assertThat(count).isEqualTo(1.0);
+    assertThat(totalTimeSecs).isWithin(0.01).of(0.150);
+  }
+
+  @Test
+  public void recordIssuanceSubOperationTime_succeeds() {
+    systemMetrics.recordIssuanceSubOperationTime(
+        IssuanceSubOperation.VERIFY_ATTESTATION, Duration.ofMillis(150));
+
+    double count =
+        registry
+            .get("tca.issuance_operation_time")
+            .tag("operation", "verify_attestation")
+            .timer()
+            .count();
+    double totalTimeSecs =
+        registry
+            .get("tca.issuance_operation_time")
+            .tag("operation", "verify_attestation")
+            .timer()
+            .totalTime(TimeUnit.SECONDS);
+
+    assertThat(count).isEqualTo(1.0);
+    assertThat(totalTimeSecs).isWithin(0.01).of(0.150);
   }
 }

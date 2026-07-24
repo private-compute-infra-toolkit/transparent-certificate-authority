@@ -18,8 +18,12 @@ package com.google.tca.adapters.oidc;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.tca.domain.metric.Metrics;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.security.Key;
@@ -54,6 +58,7 @@ public class OidcJwksKeyFetcherTest {
   private OidcJwksKeyFetcher keyFetcher;
 
   @Mock private InstantSource mockInstantSource;
+  @Mock private Metrics mockMetrics;
 
   @Before
   public void setUp() throws Exception {
@@ -68,7 +73,8 @@ public class OidcJwksKeyFetcherTest {
             () -> server.url("/").toString(),
             mockInstantSource,
             HttpClient.newHttpClient(),
-            mapper);
+            mapper,
+            mockMetrics);
 
     // Generate a real RSA key pair to create a valid JWKS.
     KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -100,6 +106,9 @@ public class OidcJwksKeyFetcherTest {
 
     assertThat(key).isPresent();
     assertThat(server.getRequestCount()).isEqualTo(1);
+    verify(mockMetrics).recordOidcJwksLookup();
+    verify(mockMetrics).recordOidcJwksMiss();
+    verify(mockMetrics).recordOidcJwksFetchTime(any());
   }
 
   @Test
@@ -114,6 +123,9 @@ public class OidcJwksKeyFetcherTest {
 
     assertThat(key).isPresent();
     assertThat(server.getRequestCount()).isEqualTo(1);
+    verify(mockMetrics, times(2)).recordOidcJwksLookup();
+    verify(mockMetrics, times(1)).recordOidcJwksMiss();
+    verify(mockMetrics, times(1)).recordOidcJwksFetchTime(any());
   }
 
   @Test

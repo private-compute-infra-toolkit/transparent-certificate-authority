@@ -33,6 +33,7 @@ import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
 import com.google.tca.domain.attestation.EndorsementAnnotations;
 import com.google.tca.domain.attestation.Validity;
+import com.google.tca.domain.metric.IssuanceSubOperation;
 import com.google.tca.domain.metric.Metrics;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.policy.Policy;
@@ -91,6 +92,20 @@ public class TransparentCaServiceTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
+    when(mockMetrics.startIssuanceTimer())
+        .thenAnswer(
+            invocation ->
+                new Metrics.IssuanceTimer() {
+                  private long subOpStartNano = System.nanoTime();
+
+                  @Override
+                  public void recordSubOperationAndResetTimer(IssuanceSubOperation operation) {
+                    long now = System.nanoTime();
+                    mockMetrics.recordIssuanceSubOperationTime(
+                        operation, java.time.Duration.ofNanos(now - subOpStartNano));
+                    subOpStartNano = now;
+                  }
+                });
     transparentCaService =
         new TransparentCaService(
             mockRootCertificate,
@@ -160,6 +175,21 @@ public class TransparentCaServiceTest {
     assertEquals(signedCerts.get(0), mockChildCertificate);
     assertEquals(signedCerts.get(1), mockRootCertificate);
     verify(mockMetrics).incrementCertificateIssuanceCounter("issuer/subject");
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(eq(IssuanceSubOperation.EXTRACT_PUBLIC_KEY), any());
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(eq(IssuanceSubOperation.VALIDATE_AUDIENCE), any());
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(
+            eq(IssuanceSubOperation.ENDORSEMENT_METADATA_PARSING), any());
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(eq(IssuanceSubOperation.POLICY_RESOLUTION), any());
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(eq(IssuanceSubOperation.VERIFIER_RESOLUTION), any());
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(eq(IssuanceSubOperation.VERIFY_ATTESTATION), any());
+    verify(mockMetrics)
+        .recordIssuanceSubOperationTime(eq(IssuanceSubOperation.SIGN_CERTIFICATE), any());
   }
 
   @Test

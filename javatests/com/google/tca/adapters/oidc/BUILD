@@ -22,6 +22,7 @@ java_test(
     srcs = ["OidcJwksKeyFetcherTest.java"],
     deps = [
         "//java/com/google/tca/adapters/oidc",
+        "//java/com/google/tca/domain/metric",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_truth_truth",

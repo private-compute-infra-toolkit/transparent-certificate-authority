@@ -19,6 +19,8 @@ package(default_visibility = ["//visibility:public"])
 java_library(
     name = "metric",
     srcs = [
+        "IssuanceSubOperation.java",
+        "JwksCacheResult.java",
         "Metrics.java",
         "ProcessingStatus.java",
         "Status.java",

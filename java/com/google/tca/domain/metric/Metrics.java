@@ -29,4 +29,22 @@ public interface Metrics {
   void incrementCertificateIssuanceCounter(String clientId);
 
   void setRootCertificateValidity(Duration remaining);
+
+  /** Records that a JWKS key lookup was performed. */
+  void recordOidcJwksLookup();
+
+  /** Records that a JWKS cache miss (fetch) occurred. */
+  void recordOidcJwksMiss();
+
+  /** Records the duration of an OIDC JWKS key fetch call. */
+  void recordOidcJwksFetchTime(Duration duration);
+
+  /** Records the duration of a sub-operation within the certificate issuance call. */
+  void recordIssuanceSubOperationTime(IssuanceSubOperation operation, Duration duration);
+
+  interface IssuanceTimer {
+    void recordSubOperationAndResetTimer(IssuanceSubOperation operation);
+  }
+
+  IssuanceTimer startIssuanceTimer();
 }

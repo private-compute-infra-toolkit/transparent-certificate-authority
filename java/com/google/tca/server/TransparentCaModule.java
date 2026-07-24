@@ -64,6 +64,9 @@ import com.google.tca.domain.metric.Metrics;
 import com.google.tlog.TlogEntry;
 import com.google.tlog.TransparencyLogClient;
 import io.jsonwebtoken.Locator;
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
+import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
@@ -129,9 +132,12 @@ public class TransparentCaModule extends AbstractModule {
   @Singleton
   @GcpAttestation
   OidcJwksKeyFetcher provideGcpOidcJwksKeyFetcher(
-      InstantSource instantSource, HttpClient httpClient, ObjectMapper objectMapper) {
+      InstantSource instantSource,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      Metrics metrics) {
     return new OidcJwksKeyFetcher(
-        () -> GcpAttestationVerifier.JWKS_URI, instantSource, httpClient, objectMapper);
+        () -> GcpAttestationVerifier.JWKS_URI, instantSource, httpClient, objectMapper, metrics);
   }
 
   @Provides
@@ -148,14 +154,16 @@ public class TransparentCaModule extends AbstractModule {
       OidcDiscoveryFetcher discoveryFetcher,
       InstantSource instantSource,
       HttpClient httpClient,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      Metrics metrics) {
     return new OidcJwksKeyFetcher(
         () ->
             discoveryFetcher.fetchJwksUri(
                 "https://accounts.google.com/.well-known/openid-configuration"),
         instantSource,
         httpClient,
-        objectMapper);
+        objectMapper,
+        metrics);
   }
 
   @Provides
@@ -200,7 +208,13 @@ public class TransparentCaModule extends AbstractModule {
         .config()
         .meterFilter(MeterFilter.acceptNameStartsWith("tca."))
         .meterFilter(MeterFilter.acceptNameStartsWith("armeria.server.connections"))
+        .meterFilter(MeterFilter.acceptNameStartsWith("jvm."))
+        .meterFilter(MeterFilter.acceptNameStartsWith("system."))
+        .meterFilter(MeterFilter.acceptNameStartsWith("process."))
         .meterFilter(MeterFilter.deny());
+    new JvmMemoryMetrics().bindTo(registry);
+    new JvmThreadMetrics().bindTo(registry);
+    new ProcessorMetrics().bindTo(registry);
     return registry;
   }
 
