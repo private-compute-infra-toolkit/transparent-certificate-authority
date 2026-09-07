@@ -18,7 +18,6 @@ filegroup(
     name = "test_resources",
     srcs = [
         "testdata/golden_request.textproto",
-        "testdata/policy/v1/policy.textproto",
         "testdata/policy/v2/policy.textproto",
         "testdata/reference_values.textproto",
         "testdata/test_tca_config.json",
@@ -114,6 +113,7 @@ java_test(
         "@com_google_protobuf//:protobuf_javalite",
         "@io_grpc_grpc_java//api",
         "@io_grpc_grpc_java//inprocess",
+        "@io_grpc_grpc_java//netty",
         "@io_grpc_grpc_java//stub",
         "@io_grpc_grpc_java//testing",
         "@maven//:com_google_guava_guava",
@@ -163,6 +163,7 @@ java_test(
         "@com_google_protobuf//java/core",
         "@io_grpc_grpc_java//api",
         "@io_grpc_grpc_java//inprocess",
+        "@io_grpc_grpc_java//netty",
         "@io_grpc_grpc_java//stub",
         "@io_grpc_grpc_java//testing",
         "@maven//:com_google_guava_guava",
@@ -205,10 +206,11 @@ java_test(
         "@maven//:org_bouncycastle_bcprov_jdk18on",
         "@maven//:org_mockito_mockito_core",
         "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
         "@pcit_mbs//java/com/google/kmsclient",
         "@pcit_mbs//java/com/google/mbs:certmanagement",
+        "@pcit_mbs//java/com/google/mbs:module",
         "@pcit_mbs//java/com/google/mbs/attestationcollection",
-        "@pcit_mbs//java/com/google/tlog",
     ],
 )
 

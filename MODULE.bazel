@@ -106,9 +106,9 @@ local_path_override(
 bazel_dep(name = "oak", version = "0.0.0")
 archive_override(
     module_name = "oak",
-    sha256 = "1f0dfe4a2ae3e27e689912e28f7f78fee7f6519f1980ece633fbb97bfca48f6a",
-    strip_prefix = "oak-33f295f6c62879525dba440ad0c0508bb492ae2d",
-    url = "https://github.com/project-oak/oak/archive/33f295f6c62879525dba440ad0c0508bb492ae2d.tar.gz",
+    sha256 = "f3bad5d5854193c9143d7761beb782eb4a0d16f1e452e9d689a3bb207f56089d",
+    strip_prefix = "oak-61256023e3176bbf4b1ff0774d75982b1481026d",
+    url = "https://github.com/project-oak/oak/archive/61256023e3176bbf4b1ff0774d75982b1481026d.tar.gz",
 )
 
 oak_crates = use_extension("@oak//bazel/crates:extensions.bzl", "aliased_crates_repository")
@@ -282,3 +282,10 @@ crate.spec(
 )
 crate.from_specs(name = "tca_crates")
 use_repo(crate, "oak_std_crates_index", crates = "tca_crates")
+
+# Inhibit rules_rust from registering its default toolchains (which include an
+# outdated nightly toolchain that would shadow Oak's modern nightly toolchain).
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    versions = [],
+)

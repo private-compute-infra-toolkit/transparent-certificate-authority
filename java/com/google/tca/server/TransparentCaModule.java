@@ -22,8 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.FluentLogger;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.google.mbs.MeasurementBoundCertificate;
-import com.google.mbs.attestationcollection.aws.AwsAttestationModule;
+import com.google.mbs.qualifier.MbsRoot;
 import com.google.tca.adapters.AttestationVerifierProviderImpl;
 import com.google.tca.adapters.AwsAttestationEvidence;
 import com.google.tca.adapters.CachedFileFetcher;
@@ -61,8 +60,6 @@ import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
 import com.google.tca.domain.metric.Metrics;
-import com.google.tlog.TlogEntry;
-import com.google.tlog.TransparencyLogClient;
 import io.jsonwebtoken.Locator;
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
@@ -73,11 +70,9 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import jakarta.inject.Singleton;
 import java.net.http.HttpClient;
 import java.security.Key;
-import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.time.InstantSource;
 import java.util.Map;
-import java.util.Optional;
 import software.amazon.awssdk.services.s3.S3Client;
 
 /** Guice module for the TCA service. */
@@ -91,7 +86,6 @@ public class TransparentCaModule extends AbstractModule {
     bind(InstantSource.class).toInstance(InstantSource.system());
     bind(HttpClient.class).toInstance(HttpClient.newHttpClient());
     bind(AttestationVerifierProvider.class).to(AttestationVerifierProviderImpl.class);
-    install(new AwsAttestationModule());
     bind(CertificateSigner.class).to(CertificateSignerImpl.class);
     bind(KeyDecoder.class).to(KeyDecoderImpl.class);
     bind(AttestationVerifier.class)
@@ -110,22 +104,6 @@ public class TransparentCaModule extends AbstractModule {
   public FileFetcher provideFileFetcher(
       S3Client s3Client, @PolicyBucket String bucket, InstantSource instantSource) {
     return new CachedFileFetcher(new S3FileFetcher(s3Client, bucket), instantSource);
-  }
-
-  @Provides
-  @Singleton
-  public TransparencyLogClient provideTransparencyLogClient() {
-    return new TransparencyLogClient() {
-      @Override
-      public TlogEntry recordCertificate(X509Certificate c, PrivateKey k) {
-        return new TlogEntry("{\"status\":\"dummy\"}");
-      }
-
-      @Override
-      public Optional<TlogEntry> getTlogEntryByCertificate(X509Certificate c) {
-        return Optional.of(new TlogEntry("{\"status\":\"dummy\"}"));
-      }
-    };
   }
 
   @Provides
@@ -185,16 +163,6 @@ public class TransparentCaModule extends AbstractModule {
   }
 
   @Provides
-  X509Certificate provideRootCertificate(MeasurementBoundCertificate measurementBoundCertificate) {
-    return measurementBoundCertificate.getCertificate();
-  }
-
-  @Provides
-  PrivateKey providePrivateKey(MeasurementBoundCertificate measurementBoundCertificate) {
-    return measurementBoundCertificate.getPrivateKey();
-  }
-
-  @Provides
   @Singleton
   public ObjectMapper provideObjectMapper() {
     return new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -221,7 +189,7 @@ public class TransparentCaModule extends AbstractModule {
   @Provides
   @Singleton
   @TrustDomain
-  String provideTrustDomain(X509Certificate rootCertificate)
+  String provideTrustDomain(@MbsRoot X509Certificate rootCertificate)
       throws java.security.cert.CertificateParsingException, java.net.URISyntaxException {
     return TrustDomainExtractor.extract(rootCertificate);
   }

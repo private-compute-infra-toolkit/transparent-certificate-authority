@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# java/com/google/tlog/BUILD
-
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_java//java:defs.bzl", "java_test")
 
 package(default_visibility = ["//visibility:public"])
 
-java_library(
-    name = "tlog",
-    srcs = [
-        "RekorClientImpl.java",
-        "TlogEntry.java",
-        "TransparencyLogClient.java",
-    ],
+java_test(
+    name = "S3KeyBackupStorageTest",
+    size = "small",
+    srcs = ["S3KeyBackupStorageTest.java"],
     deps = [
-        "@maven//:com_google_guava_guava",
-        "@maven//:dev_sigstore_sigstore_java",
-        "@maven//:org_bouncycastle_bcpkix_jdk18on",
-        "@maven//:org_bouncycastle_bcprov_jdk18on",
+        "//java/com/google/mbs:certmanagement",
+        "//java/com/google/mbs/adapters",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )

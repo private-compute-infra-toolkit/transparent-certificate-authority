@@ -26,6 +26,11 @@ variable "extra_tags" {
   default = {}
 }
 
+variable "pcit_packer_iam_instance_profile" {
+  type    = string
+  default = "{pcit_packer_iam_instance_profile}"
+}
+
 locals {
   //AMI naming does not support some special characters
   timestamp = formatdate("YYYY-MM-DD'T'hh-mm-ssZ", timestamp())
@@ -38,11 +43,12 @@ locals {
 }
 
 source "amazon-ebs" "sample-ami" {
-  ami_name      = "{ami_name}--${local.timestamp}"
-  instance_type = "{ec2_instance}"
-  region        = "{aws_region}"
-  ami_groups    = {ami_groups}
-  subnet_id     = "{subnet_id}"
+  ami_name             = "{ami_name}--${local.timestamp}"
+  instance_type        = "{ec2_instance}"
+  region               = "{aws_region}"
+  ami_groups           = {ami_groups}
+  subnet_id            = "{subnet_id}"
+  iam_instance_profile = var.pcit_packer_iam_instance_profile != "" ? var.pcit_packer_iam_instance_profile : null
 
   // Custom Base AMI
   source_ami_filter {
@@ -147,7 +153,7 @@ build {
       # https://aws.amazon.com/articles/how-to-share-and-use-public-amis-in-a-secure-manner/
       # This removes the auto-generated Packer key (created in
       # /home/ec2-user/.ssh/authorized_keys).
-      "sudo find / -name authorized_keys -delete -print",
+      "sudo find / -ignore_readdir_race -name authorized_keys -delete -print",
       # Note: omitting deletion of shell history and VCS files because they are
       # not present in these AMIs.
       "if ( $UNINSTALL_SSH_SERVER ); then sudo rpm -e openssh-server; fi",

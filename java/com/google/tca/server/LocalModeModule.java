@@ -16,16 +16,12 @@
 
 package com.google.tca.server;
 
-import com.google.common.flogger.FluentLogger;
 import com.google.inject.AbstractModule;
-import com.google.inject.Provides;
-import com.google.kmsclient.KmsClientInterface;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.MeasurementBoundCertificate;
-import com.google.mbs.MeasurementBoundCertificateProvider;
 import com.google.mbs.attestationcollection.AttestationToken;
-import jakarta.annotation.Nullable;
-import jakarta.inject.Singleton;
+import com.google.mbs.qualifier.MbsRoot;
+import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -35,11 +31,9 @@ import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import software.amazon.awssdk.services.s3.S3Client;
 
 /** Guice module for TCA local mode. */
 public class LocalModeModule extends AbstractModule {
-  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   static {
     if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
@@ -63,33 +57,6 @@ public class LocalModeModule extends AbstractModule {
                 .setEnvironment("local")
                 .setDomain("pcit.goog")
                 .build());
-  }
-
-  @Provides
-  @Singleton
-  @Nullable
-  S3Client provideS3Client() {
-    return null;
-  }
-
-  @Provides
-  @Singleton
-  @Nullable
-  KmsClientInterface provideKmsClient() {
-    return null;
-  }
-
-  @Provides
-  @Singleton
-  @Nullable
-  MeasurementBoundCertificateProvider provideCertificateProvider() {
-    return null;
-  }
-
-  @Provides
-  @Singleton
-  MeasurementBoundCertificate provideMeasurementBoundCertificate() throws Exception {
-    logger.atInfo().log("TCA Module: Local mode. Generating self-signed certificate.");
 
     MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
@@ -103,11 +70,14 @@ public class LocalModeModule extends AbstractModule {
                 KeyUsage.keyCertSign)
             .generate();
 
-    X509Certificate certificate = certAndKey.certificate();
+    MeasurementBoundCertificate cert =
+        new MeasurementBoundCertificate(
+            certAndKey.certificate(),
+            certAndKey.privateKey(),
+            AttestationToken.fromBytes("DummyToken".getBytes()));
 
-    // Attestation tokens are only generated in remote attestation; use an empty token in local
-    // mode.
-    AttestationToken emptyToken = AttestationToken.fromBytes(new byte[0]);
-    return new MeasurementBoundCertificate(certificate, certAndKey.privateKey(), emptyToken);
+    bind(MeasurementBoundCertificate.class).toInstance(cert);
+    bind(X509Certificate.class).annotatedWith(MbsRoot.class).toInstance(cert.getCertificate());
+    bind(PrivateKey.class).annotatedWith(MbsRoot.class).toInstance(cert.getPrivateKey());
   }
 }

@@ -27,8 +27,10 @@ import com.google.common.io.BaseEncoding;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.util.Modules;
+import com.google.mbs.qualifier.MbsRoot;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
 import com.google.tca.adapters.OakAttestationEvidence;
@@ -83,10 +85,7 @@ public class CertificateIssuanceComponentTest {
   @Parameters(name = "{0}")
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[][] {
-          {"javatests/com/google/tca/server/testdata/policy/v1/policy.textproto"},
-          {"javatests/com/google/tca/server/testdata/policy/v2/policy.textproto"}
-        });
+        new Object[][] {{"javatests/com/google/tca/server/testdata/policy/v2/policy.textproto"}});
   }
 
   @Parameter public String policyPath;
@@ -147,7 +146,7 @@ public class CertificateIssuanceComponentTest {
             new LocalModeModule(localArgs));
 
     transparentCaService = injector.getInstance(TransparentCaService.class);
-    rootCertificate = injector.getInstance(X509Certificate.class);
+    rootCertificate = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
   }
 
   @Test
@@ -221,11 +220,12 @@ public class CertificateIssuanceComponentTest {
       assertThat(permitted).hasLength(2);
       assertThat(permitted[0].getBase().getTagNo())
           .isEqualTo(GeneralName.uniformResourceIdentifier);
-      String suffix = policyPath.contains("/v2/") ? ".tca.local.test" : "";
-      assertThat(permitted[0].getBase().getName().toString()).isEqualTo(".example1.org" + suffix);
+      assertThat(permitted[0].getBase().getName().toString())
+          .isEqualTo(".example1.org.tca.local.test");
       assertThat(permitted[1].getBase().getTagNo())
           .isEqualTo(GeneralName.uniformResourceIdentifier);
-      assertThat(permitted[1].getBase().getName().toString()).isEqualTo(".example2.org" + suffix);
+      assertThat(permitted[1].getBase().getName().toString())
+          .isEqualTo(".example2.org.tca.local.test");
     }
 
     assertEquals(rootCertificate, issuedCerts.get(1));

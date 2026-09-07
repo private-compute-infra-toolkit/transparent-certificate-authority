@@ -12,23 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@protobuf//bazel:java_proto_library.bzl", "java_proto_library")
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_java//java:defs.bzl", "java_library")
 
 package(default_visibility = ["//visibility:public"])
 
-proto_library(
-    name = "tca_policy_proto",
+java_library(
+    name = "adapters",
     srcs = [
-        "tca_policy.proto",
+        "S3KeyBackupStorage.java",
     ],
     deps = [
-        "@oak//proto/attestation:reference_value_proto",
-        "@protobuf//:duration_proto",
+        "//java/com/google/mbs:certmanagement",
+        "@maven//:jakarta_inject_jakarta_inject_api",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
-)
-
-java_proto_library(
-    name = "tca_policy_java_proto",
-    deps = [":tca_policy_proto"],
 )

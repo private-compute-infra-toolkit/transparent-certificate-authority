@@ -84,27 +84,6 @@ java_test(
 )
 
 java_test(
-    name = "PolicyV1MapperTest",
-    size = "small",
-    srcs = ["PolicyV1MapperTest.java"],
-    data = [
-        "resources/policy/v1/invalid_reference_values.textproto",
-        "resources/policy/v1/test_policies.textproto",
-    ],
-    test_class = "com.google.tca.adapters.PolicyV1MapperTest",
-    deps = [
-        "//java/com/google/tca/adapters",
-        "//java/com/google/tca/domain/policy",
-        "//java/com/google/tca/proto:tca_policy_java_proto",
-        "@com_google_protobuf//java/core",
-        "@maven//:com_google_guava_guava",
-        "@maven//:com_google_truth_truth",
-        "@maven//:junit_junit",
-        "@oak//proto/attestation:reference_value_java_proto",
-    ],
-)
-
-java_test(
     name = "PolicyV2MapperTest",
     size = "small",
     srcs = ["PolicyV2MapperTest.java"],
@@ -178,7 +157,6 @@ java_test(
     size = "small",
     srcs = ["FileSourcedPolicyProviderTest.java"],
     data = [
-        "resources/policy/v1/test_policies.textproto",
         "resources/policy/v2/test_policies.textproto",
     ],
     test_class = "com.google.tca.adapters.FileSourcedPolicyProviderTest",

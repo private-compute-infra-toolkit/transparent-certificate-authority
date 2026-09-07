@@ -17,62 +17,22 @@
 package com.google.tca.server;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import com.google.kmsclient.KmsClientInterface;
-import com.google.kmsclient.KmsGeneratedKey;
-import com.google.mbs.KeyBackupBucketProperties;
-import com.google.mbs.MeasurementBoundCertificate;
-import com.google.mbs.MeasurementBoundCertificateProvider;
-import com.google.mbs.Metrics;
-import com.google.mbs.attestationcollection.AttestationCollector;
-import com.google.mbs.attestationcollection.AttestationToken;
-import com.google.tlog.TlogEntry;
-import com.google.tlog.TransparencyLogClient;
+import com.google.mbs.MbsCertificateFactory;
 import java.security.cert.X509Certificate;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 @RunWith(JUnit4.class)
 public class KmsModeModuleTest {
 
-  private KmsClientInterface kmsClient;
-  private S3Client s3Client;
-  private TransparencyLogClient tlogClient;
-  private AttestationCollector attestationCollector;
-  private KeyBackupBucketProperties bucketProperties;
-
-  @Before
-  public void setUp() {
-    kmsClient = mock(KmsClientInterface.class);
-    s3Client = mock(S3Client.class);
-    tlogClient = mock(TransparencyLogClient.class);
-    attestationCollector = mock(AttestationCollector.class);
-    bucketProperties = mock(KeyBackupBucketProperties.class);
-
-    when(bucketProperties.getPublicBucketName()).thenReturn("test-public-bucket");
-    when(bucketProperties.getPrivateBucketName()).thenReturn("test-private-bucket");
-    when(bucketProperties.getCertPath()).thenReturn("cert.pem");
-    when(bucketProperties.getKmsEncryptedDataKeyPath()).thenReturn("data-key.enc");
-    when(bucketProperties.getAesEncryptedPrivateKeyPath()).thenReturn("key.enc");
-    when(bucketProperties.getAttestationDocPath()).thenReturn("attestation.doc");
-    when(bucketProperties.getTlogEntryPath()).thenReturn("tlog.json");
-  }
-
   @Test
-  public void provideCertificateProvider_generatesCertificateWithCorrectSpiffeIdInSan()
+  public void provideMbsCertificateFactory_generatesCertificateWithCorrectSpiffeIdInSan()
       throws Exception {
     // 1. Setup module with test metadata
     String testEnv = "testenv";
@@ -87,39 +47,15 @@ public class KmsModeModuleTest {
     KmsArgs kmsArgs = new KmsArgs();
     KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
 
-    // 2. Get the provider
-    Metrics mockMetrics = mock(Metrics.class);
-    MeasurementBoundCertificateProvider provider =
-        module.provideCertificateProvider(
-            kmsClient, s3Client, bucketProperties, tlogClient, attestationCollector, mockMetrics);
+    // 2. Get the certificate factory & generate certificate
+    MbsCertificateFactory factory = module.provideMbsCertificateFactory();
+    X509Certificate rootCert = factory.generate().certificate();
 
-    // 3. Setup mocks to trigger the certificate generation path
-    when(s3Client.getObject(any(GetObjectRequest.class)))
-        .thenThrow(NoSuchKeyException.builder().build());
-
-    byte[] mockPlaintextKey = new byte[32];
-    new java.security.SecureRandom().nextBytes(mockPlaintextKey);
-    KmsGeneratedKey mockGeneratedKey =
-        KmsGeneratedKey.builder()
-            .setPlaintext(mockPlaintextKey)
-            .setCiphertext(new byte[32])
-            .build();
-    when(kmsClient.generateDataKey(anyString())).thenReturn(mockGeneratedKey);
-
-    when(attestationCollector.collectBoundToPubkey(any(), any()))
-        .thenReturn(AttestationToken.fromBytes(new byte[0]));
-
-    when(tlogClient.recordCertificate(any(), any())).thenReturn(new TlogEntry("{}"));
-
-    // 4. Load (generate) certificate
-    MeasurementBoundCertificate mbsCert = provider.loadOrGenerateCertificate();
-    X509Certificate rootCert = mbsCert.getCertificate();
-
-    // 5. Verify subject principal
+    // 3. Verify subject principal
     assertThat(rootCert.getSubjectX500Principal().getName())
         .isEqualTo("CN=TCA Root,O=Google LLC,C=US");
 
-    // 6. Verify the constructed SPIFFE ID in the SAN extension
+    // 4. Verify the constructed SPIFFE ID in the SAN extension
     String expectedSpiffeId =
         "spiffe://tca.testenv.testdomain/operator/pcit.goog/123456789012/publisher/google.com/pcit-release-bot/workload/transparent-certificate-authority";
 
@@ -136,7 +72,7 @@ public class KmsModeModuleTest {
   }
 
   @Test
-  public void provideCertificateProvider_prodEnv_stripsAwsSubdomainAndOmitEnv() throws Exception {
+  public void provideMbsCertificateFactory_prodEnv_stripsAwsSubdomainAndOmitEnv() throws Exception {
     // 1. Setup module with prod metadata and "aws." subdomain
     String testEnv = "prod";
     String testDomain = "aws.pcit.goog";
@@ -150,39 +86,15 @@ public class KmsModeModuleTest {
     KmsArgs kmsArgs = new KmsArgs();
     KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
 
-    // 2. Get the provider
-    Metrics mockMetrics = mock(Metrics.class);
-    MeasurementBoundCertificateProvider provider =
-        module.provideCertificateProvider(
-            kmsClient, s3Client, bucketProperties, tlogClient, attestationCollector, mockMetrics);
+    // 2. Get the certificate factory & generate certificate
+    MbsCertificateFactory factory = module.provideMbsCertificateFactory();
+    X509Certificate rootCert = factory.generate().certificate();
 
-    // 3. Setup mocks to trigger the certificate generation path
-    when(s3Client.getObject(any(GetObjectRequest.class)))
-        .thenThrow(NoSuchKeyException.builder().build());
-
-    byte[] mockPlaintextKey = new byte[32];
-    new java.security.SecureRandom().nextBytes(mockPlaintextKey);
-    KmsGeneratedKey mockGeneratedKey =
-        KmsGeneratedKey.builder()
-            .setPlaintext(mockPlaintextKey)
-            .setCiphertext(new byte[32])
-            .build();
-    when(kmsClient.generateDataKey(anyString())).thenReturn(mockGeneratedKey);
-
-    when(attestationCollector.collectBoundToPubkey(any(), any()))
-        .thenReturn(AttestationToken.fromBytes(new byte[0]));
-
-    when(tlogClient.recordCertificate(any(), any())).thenReturn(new TlogEntry("{}"));
-
-    // 4. Load (generate) certificate
-    MeasurementBoundCertificate mbsCert = provider.loadOrGenerateCertificate();
-    X509Certificate rootCert = mbsCert.getCertificate();
-
-    // 5. Verify subject principal
+    // 3. Verify subject principal
     assertThat(rootCert.getSubjectX500Principal().getName())
         .isEqualTo("CN=TCA Root,O=Google LLC,C=US");
 
-    // 6. Verify the constructed SPIFFE ID in the SAN extension (should be tca.pcit.goog)
+    // 4. Verify the constructed SPIFFE ID in the SAN extension (should be tca.pcit.goog)
     String expectedSpiffeId =
         "spiffe://tca.pcit.goog/operator/pcit.goog/123456789012/publisher/google.com/pcit-release-bot/workload/transparent-certificate-authority";
 

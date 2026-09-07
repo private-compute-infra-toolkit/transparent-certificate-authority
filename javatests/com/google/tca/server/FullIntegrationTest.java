@@ -24,10 +24,12 @@ import static org.mockito.Mockito.when;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.MeasurementBoundCertificate;
 import com.google.mbs.attestationcollection.AttestationToken;
+import com.google.mbs.qualifier.MbsRoot;
 import com.google.tca.adapters.PolicyBucket;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
@@ -100,10 +102,7 @@ public class FullIntegrationTest {
   @Parameters(name = "{0}")
   public static java.util.Collection<Object[]> data() {
     return java.util.Arrays.asList(
-        new Object[][] {
-          {"javatests/com/google/tca/server/testdata/policy/v1/policy.textproto"},
-          {"javatests/com/google/tca/server/testdata/policy/v2/policy.textproto"}
-        });
+        new Object[][] {{"javatests/com/google/tca/server/testdata/policy/v2/policy.textproto"}});
   }
 
   @Parameter public String policyPath;
@@ -204,8 +203,12 @@ public class FullIntegrationTest {
                             .annotatedWith(PolicyBucket.class)
                             .toInstance(BUCKET_NAME);
                         bind(MeasurementBoundCertificate.class).toInstance(mbs);
-                        bind(X509Certificate.class).toInstance(mbs.getCertificate());
-                        bind(java.security.PrivateKey.class).toInstance(mbs.getPrivateKey());
+                        bind(X509Certificate.class)
+                            .annotatedWith(MbsRoot.class)
+                            .toInstance(mbs.getCertificate());
+                        bind(java.security.PrivateKey.class)
+                            .annotatedWith(MbsRoot.class)
+                            .toInstance(mbs.getPrivateKey());
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
                             .annotatedWith(JwtAuth.class)
@@ -328,7 +331,7 @@ public class FullIntegrationTest {
             cf.generateCertificate(
                 new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
 
-    X509Certificate rootCert = injector.getInstance(X509Certificate.class);
+    X509Certificate rootCert = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
 
     X509Certificate responseRootCert =
         (X509Certificate)
@@ -369,11 +372,10 @@ public class FullIntegrationTest {
       assertThat(permitted).hasLength(2);
       GeneralName generalName1 = permitted[0].getBase();
       assertThat(generalName1.getTagNo()).isEqualTo(GeneralName.uniformResourceIdentifier);
-      String suffix = policyPath.contains("/v2/") ? ".tca.local.test" : "";
-      assertThat(generalName1.getName().toString()).isEqualTo(".example1.org" + suffix);
+      assertThat(generalName1.getName().toString()).isEqualTo(".example1.org.tca.local.test");
       GeneralName generalName2 = permitted[1].getBase();
       assertThat(generalName2.getTagNo()).isEqualTo(GeneralName.uniformResourceIdentifier);
-      assertThat(generalName2.getName().toString()).isEqualTo(".example2.org" + suffix);
+      assertThat(generalName2.getName().toString()).isEqualTo(".example2.org.tca.local.test");
     }
 
     // Verify the Basic Constraints extension
@@ -537,7 +539,7 @@ public class FullIntegrationTest {
   private void uploadMismatchedPolicyToS3(String publisher_id, String workload_id)
       throws Exception {
     String policy =
-        readTestFile("javatests/com/google/tca/server/testdata/policy/v1/policy.textproto");
+        readTestFile("javatests/com/google/tca/server/testdata/policy/v2/policy.textproto");
     String oakContainersReferenceValues =
         readTestFile("javatests/com/google/tca/server/testdata/reference_values.textproto");
     policy =

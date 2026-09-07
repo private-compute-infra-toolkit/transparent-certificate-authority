@@ -18,6 +18,7 @@ package com.google.tca.server;
 
 import com.google.common.flogger.FluentLogger;
 import com.google.common.util.concurrent.AbstractScheduledService;
+import com.google.mbs.qualifier.MbsRoot;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
 import jakarta.inject.Inject;
@@ -37,7 +38,7 @@ public class CertificateValidityReporter extends AbstractScheduledService {
 
   @Inject
   public CertificateValidityReporter(
-      X509Certificate certificate, Metrics metrics, TimeProvider timeProvider) {
+      @MbsRoot X509Certificate certificate, Metrics metrics, TimeProvider timeProvider) {
     this.certificate = certificate;
     this.metrics = metrics;
     this.timeProvider = timeProvider;

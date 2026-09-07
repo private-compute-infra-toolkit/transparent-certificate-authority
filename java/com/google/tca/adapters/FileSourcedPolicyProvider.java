@@ -54,14 +54,6 @@ public class FileSourcedPolicyProvider implements PolicyProvider {
                     com.google.tca.policy.v2.Policies.newBuilder();
                 TextFormat.getParser().merge(content, builder);
                 return PolicyV2Mapper.toDomain(builder.build());
-              }),
-          new NamedParser(
-              "google.tca.policy.v1.Policies",
-              content -> {
-                com.google.tca.policy.v1.Policies.Builder builder =
-                    com.google.tca.policy.v1.Policies.newBuilder();
-                TextFormat.getParser().merge(content, builder);
-                return PolicyV1Mapper.toDomain(builder.build());
               }));
 
   @Inject

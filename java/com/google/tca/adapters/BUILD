@@ -37,7 +37,6 @@ java_library(
         "KeyDecoderImpl.java",
         "OakAttestationEvidence.java",
         "PolicyBucket.java",
-        "PolicyV1Mapper.java",
         "PolicyV2Mapper.java",
         "S3FileFetcher.java",
         "SystemMetrics.java",

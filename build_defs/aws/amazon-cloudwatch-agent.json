@@ -62,6 +62,8 @@
                 "^tca_root_certificate_validity_seconds$",
                 "^tca_oidc_jwks_fetch_time_seconds_count$",
                 "^tca_oidc_jwks_fetch_time_seconds_sum$",
+                "^tca_oidc_authentication_time_seconds_count$",
+                "^tca_oidc_authentication_time_seconds_sum$",
                 "^jvm_memory_used_bytes$",
                 "^jvm_threads_live_threads$",
                 "^process_cpu_usage$",

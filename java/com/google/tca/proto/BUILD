@@ -35,7 +35,6 @@ java_grpc_library(
 java_proto_library(
     name = "tca_policy_java_proto",
     deps = [
-        "@pcit_api//google/tca/policy/v1:tca_policy_proto",
         "@pcit_api//google/tca/policy/v2:tca_policy_proto",
     ],
 )

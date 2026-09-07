@@ -214,6 +214,18 @@ public class SystemMetricsTest {
   }
 
   @Test
+  public void recordOidcAuthenticationTime_succeeds() {
+    systemMetrics.recordOidcAuthenticationTime(Duration.ofMillis(120));
+
+    double count = registry.get("tca.oidc_authentication_time").timer().count();
+    double totalTimeSecs =
+        registry.get("tca.oidc_authentication_time").timer().totalTime(TimeUnit.SECONDS);
+
+    assertThat(count).isEqualTo(1.0);
+    assertThat(totalTimeSecs).isWithin(0.01).of(0.120);
+  }
+
+  @Test
   public void recordIssuanceSubOperationTime_succeeds() {
     systemMetrics.recordIssuanceSubOperationTime(
         IssuanceSubOperation.VERIFY_ATTESTATION, Duration.ofMillis(150));

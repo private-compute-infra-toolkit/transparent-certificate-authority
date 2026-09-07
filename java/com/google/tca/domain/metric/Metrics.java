@@ -39,6 +39,9 @@ public interface Metrics {
   /** Records the duration of an OIDC JWKS key fetch call. */
   void recordOidcJwksFetchTime(Duration duration);
 
+  /** Records the total duration of an OIDC JWT authentication call in JwtInterceptor. */
+  void recordOidcAuthenticationTime(Duration duration);
+
   /** Records the duration of a sub-operation within the certificate issuance call. */
   void recordIssuanceSubOperationTime(IssuanceSubOperation operation, Duration duration);
 

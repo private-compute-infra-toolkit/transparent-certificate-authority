@@ -109,9 +109,10 @@ java_library(
         "@pcit_mbs//java/com/google/kmsclient",
         "@pcit_mbs//java/com/google/kmsclient/aws",
         "@pcit_mbs//java/com/google/mbs:certmanagement",
+        "@pcit_mbs//java/com/google/mbs:dummy_cert_provider",
+        "@pcit_mbs//java/com/google/mbs:module",
         "@pcit_mbs//java/com/google/mbs/attestationcollection",
         "@pcit_mbs//java/com/google/mbs/attestationcollection/aws",
-        "@pcit_mbs//java/com/google/tlog",
     ],
 )
 
@@ -156,7 +157,6 @@ java_binary(
         "@pcit_mbs//java/com/google/kmsclient/aws",
         "@pcit_mbs//java/com/google/mbs:certmanagement",
         "@pcit_mbs//java/com/google/mbs/attestationcollection/aws",
-        "@pcit_mbs//java/com/google/tlog",
     ],
 )
 

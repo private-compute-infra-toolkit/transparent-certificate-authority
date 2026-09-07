@@ -35,6 +35,7 @@ import static com.google.tca.domain.metric.ProcessingStatus.SIGNING_ERROR;
 import static com.google.tca.domain.metric.ProcessingStatus.SUCCESS;
 
 import com.google.common.flogger.FluentLogger;
+import com.google.mbs.qualifier.MbsRoot;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
@@ -76,8 +77,8 @@ public class TransparentCaService {
 
   @Inject
   public TransparentCaService(
-      X509Certificate rootCertificate,
-      PrivateKey privateKey,
+      @MbsRoot X509Certificate rootCertificate,
+      @MbsRoot PrivateKey privateKey,
       AttestationVerifierProvider verifierProvider,
       CertificateSigner certificateSigner,
       KeyDecoder keyDecoder,

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.8.0 (2026-08-07)
+
+
+### Dependencies
+
+* **deps:** Update DevKit to release-3.10.0
+
+
+### Features
+
+* enable crowdstrike falcon on PCIT services
+
+
+### Bug Fixes
+
+* prevent transient failures during AMI cleanup
+
 ## 0.7.0 (2026-06-22)
 
 

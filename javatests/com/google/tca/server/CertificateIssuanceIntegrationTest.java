@@ -26,10 +26,12 @@ import static org.mockito.Mockito.when;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.MeasurementBoundCertificate;
 import com.google.mbs.attestationcollection.AttestationToken;
+import com.google.mbs.qualifier.MbsRoot;
 import com.google.oak.attestation.v1.Endorsements;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
@@ -96,10 +98,7 @@ public class CertificateIssuanceIntegrationTest {
   @Parameters(name = "{0}")
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[][] {
-          {"javatests/com/google/tca/server/testdata/policy/v1/policy.textproto"},
-          {"javatests/com/google/tca/server/testdata/policy/v2/policy.textproto"}
-        });
+        new Object[][] {{"javatests/com/google/tca/server/testdata/policy/v2/policy.textproto"}});
   }
 
   @Parameter public String policyPath;
@@ -188,8 +187,10 @@ public class CertificateIssuanceIntegrationTest {
                         bind(MeasurementBoundCertificate.class)
                             .toInstance(measurementBoundCertificate);
                         bind(X509Certificate.class)
+                            .annotatedWith(MbsRoot.class)
                             .toInstance(measurementBoundCertificate.getCertificate());
                         bind(java.security.PrivateKey.class)
+                            .annotatedWith(MbsRoot.class)
                             .toInstance(measurementBoundCertificate.getPrivateKey());
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
@@ -454,7 +455,7 @@ public class CertificateIssuanceIntegrationTest {
             cf.generateCertificate(
                 new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
 
-    X509Certificate rootCert = injector.getInstance(X509Certificate.class);
+    X509Certificate rootCert = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
 
     X509Certificate responseRootCert =
         (X509Certificate)
@@ -500,14 +501,20 @@ public class CertificateIssuanceIntegrationTest {
       assertThat(permitted).hasLength(2);
       assertThat(permitted[0].getBase().getTagNo())
           .isEqualTo(GeneralName.uniformResourceIdentifier);
-      String suffix = policyPath.contains("/v2/") ? ".tca.local.test" : "";
-      assertThat(permitted[0].getBase().getName().toString()).isEqualTo(".example1.org" + suffix);
+      assertThat(permitted[0].getBase().getName().toString())
+          .isEqualTo(".example1.org.tca.local.test");
       assertThat(permitted[1].getBase().getTagNo())
           .isEqualTo(GeneralName.uniformResourceIdentifier);
-      assertThat(permitted[1].getBase().getName().toString()).isEqualTo(".example2.org" + suffix);
+      assertThat(permitted[1].getBase().getName().toString())
+          .isEqualTo(".example2.org.tca.local.test");
     }
 
     assertThat(signedCert.getBasicConstraints()).isEqualTo(1);
+
+    // Verify OIDC authentication timer metric was recorded during gRPC call
+    PrometheusMeterRegistry meterRegistry = injector.getInstance(PrometheusMeterRegistry.class);
+    double authTimerCount = meterRegistry.get("tca.oidc_authentication_time").timer().count();
+    assertThat(authTimerCount).isGreaterThan(0.0);
   }
 
   @Test
@@ -553,7 +560,7 @@ public class CertificateIssuanceIntegrationTest {
             cf.generateCertificate(
                 new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
 
-    X509Certificate rootCert = injector.getInstance(X509Certificate.class);
+    X509Certificate rootCert = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
 
     X509Certificate responseRootCert =
         (X509Certificate)

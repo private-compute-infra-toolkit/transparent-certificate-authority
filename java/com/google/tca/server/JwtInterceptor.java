@@ -34,6 +34,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.Locator;
 import jakarta.inject.Inject;
 import java.security.Key;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -62,6 +63,7 @@ public final class JwtInterceptor implements ServerInterceptor {
   @Override
   public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
       ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
+    long startNano = System.nanoTime();
     String authHeader = headers.get(AUTHORIZATION_METADATA_KEY);
 
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -70,6 +72,7 @@ public final class JwtInterceptor implements ServerInterceptor {
           Status.UNAUTHENTICATED.withDescription("Missing or invalid Authorization header"),
           new Metadata());
       metrics.incrementAuthenticationCounter(FAILURE);
+      metrics.recordOidcAuthenticationTime(Duration.ofNanos(System.nanoTime() - startNano));
       return new ServerCall.Listener<ReqT>() {};
     }
 
@@ -90,12 +93,14 @@ public final class JwtInterceptor implements ServerInterceptor {
               .withValue(SUBJECT_CONTEXT_KEY, subject)
               .withValue(AUDIENCE_CONTEXT_KEY, audiences);
       metrics.incrementAuthenticationCounter(SUCCESS);
+      metrics.recordOidcAuthenticationTime(Duration.ofNanos(System.nanoTime() - startNano));
       return Contexts.interceptCall(context, call, headers, next);
     } catch (JwtException e) {
       logger.atWarning().withCause(e).log("Failed to parse JWT token");
       call.close(
           Status.UNAUTHENTICATED.withDescription("Failed to parse JWT token"), new Metadata());
       metrics.incrementAuthenticationCounter(FAILURE);
+      metrics.recordOidcAuthenticationTime(Duration.ofNanos(System.nanoTime() - startNano));
       return new ServerCall.Listener<ReqT>() {};
     }
   }

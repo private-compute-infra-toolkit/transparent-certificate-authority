@@ -20,19 +20,15 @@ import com.google.common.flogger.FluentLogger;
 import com.google.gson.Gson;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.google.kmsclient.KmsClientInterface;
-import com.google.kmsclient.aws.AwsKmsClientModule;
-import com.google.mbs.KeyBackupBucketProperties;
-import com.google.mbs.KeyBackupBucketPropertiesFactory;
-import com.google.mbs.KmsMeasurementBoundCertificateProvider;
 import com.google.mbs.MbsCertificateFactory;
-import com.google.mbs.MeasurementBoundCertificate;
-import com.google.mbs.MeasurementBoundCertificateProvider;
+import com.google.mbs.MbsModule;
 import com.google.mbs.Metrics;
-import com.google.mbs.attestationcollection.AttestationCollector;
+import com.google.mbs.qualifier.AttestationUserData;
+import com.google.mbs.qualifier.KmsKeyArn;
+import com.google.mbs.qualifier.PrivateBackupBucket;
+import com.google.mbs.qualifier.PublicBackupBucket;
 import com.google.tca.adapters.PolicyBucket;
 import com.google.tca.adapters.SystemMetrics;
-import com.google.tlog.TransparencyLogClient;
 import jakarta.inject.Singleton;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -63,11 +59,18 @@ public class KmsModeModule extends AbstractModule {
 
   @Override
   protected void configure() {
-
-    install(new AwsKmsClientModule(awsInstanceMetadata.region()));
+    logger.atInfo().log("Installing MbsModule with AWS region: %s", awsInstanceMetadata.region());
+    install(new MbsModule(awsInstanceMetadata.region()));
     bind(String.class)
         .annotatedWith(PolicyBucket.class)
         .toInstance(awsResourceNames.configBucketName());
+    bind(String.class).annotatedWith(KmsKeyArn.class).toInstance(awsResourceNames.kmsKeyArn());
+    bind(String.class)
+        .annotatedWith(PublicBackupBucket.class)
+        .toInstance(awsResourceNames.certBackupBucketName());
+    bind(String.class)
+        .annotatedWith(PrivateBackupBucket.class)
+        .toInstance(awsResourceNames.keyBackupBucketName());
     bind(AwsInstanceMetadata.class).toInstance(awsInstanceMetadata);
     bind(Metrics.class).to(SystemMetrics.class);
   }
@@ -82,16 +85,15 @@ public class KmsModeModule extends AbstractModule {
 
   @Provides
   @Singleton
-  MeasurementBoundCertificateProvider provideCertificateProvider(
-      KmsClientInterface kmsClient,
-      S3Client s3Client,
-      KeyBackupBucketProperties bucketProperties,
-      TransparencyLogClient tlogClient,
-      AttestationCollector attestationCollector,
-      Metrics metrics) {
+  @AttestationUserData
+  byte[] provideUserData() {
     String resourceNamesJson = new Gson().toJson(awsResourceNames);
-    byte[] userData = resourceNamesJson.getBytes(StandardCharsets.UTF_8);
+    return resourceNamesJson.getBytes(StandardCharsets.UTF_8);
+  }
 
+  @Provides
+  @Singleton
+  MbsCertificateFactory provideMbsCertificateFactory() {
     String env = awsInstanceMetadata.environment();
     String domain = awsInstanceMetadata.domain();
     String operatorRole = awsInstanceMetadata.accountId();
@@ -104,37 +106,12 @@ public class KmsModeModule extends AbstractModule {
     Optional<GeneralNames> san = Optional.of(new GeneralNames(uriSan));
     logger.atInfo().log("Setting root certificate Subject Alternative Name (SAN): %s", spiffeId);
 
-    return new KmsMeasurementBoundCertificateProvider(
-        kmsClient,
-        s3Client,
-        bucketProperties,
-        awsResourceNames.kmsKeyArn(),
-        userData,
-        tlogClient,
-        attestationCollector,
-        MbsCertificateFactory.createSelfSignedCertificatesFactory(
-            new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
-            new X500Name("C=US, O=Google LLC, CN=TCA Root"),
-            Duration.between(Instant.now(), Instant.parse("2027-02-02T13:00:00Z")),
-            san,
-            KeyUsage.keyCertSign),
-        metrics);
-  }
-
-  @Provides
-  @Singleton
-  KeyBackupBucketProperties provideKeyBackupBucketProperties() {
-    return new KeyBackupBucketPropertiesFactory(
-            awsResourceNames.certBackupBucketName(), awsResourceNames.keyBackupBucketName())
-        .create();
-  }
-
-  @Provides
-  @Singleton
-  MeasurementBoundCertificate provideMeasurementBoundCertificate(
-      MeasurementBoundCertificateProvider certificateProvider) throws Exception {
-    logger.atInfo().log("TCA Module: KMS-backed mode.");
-    return certificateProvider.loadOrGenerateCertificate();
+    return MbsCertificateFactory.createSelfSignedCertificatesFactory(
+        new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
+        new X500Name("C=US, O=Google LLC, CN=TCA Root"),
+        Duration.between(Instant.now(), Instant.parse("2027-02-02T13:00:00Z")),
+        san,
+        KeyUsage.keyCertSign);
   }
 
   private static String constructTrustDomain(String env, String domain) {

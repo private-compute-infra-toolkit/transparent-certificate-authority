@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.6.0 (2026-08-10)
+
+
+### Dependencies
+
+* **deps:** Update DevKit to release-3.10.0
+* **deps:** Update DevKit to release-3.11.0
+
+
+### Features
+
+* Remove definition of TCA policy v1
+
 ## 0.5.0 (2026-06-26)
 
 

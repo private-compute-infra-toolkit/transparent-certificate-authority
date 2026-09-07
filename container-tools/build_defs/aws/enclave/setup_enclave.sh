@@ -34,6 +34,25 @@ sudo systemctl enable nitro-enclaves-allocator.service
 
 sudo rpm -i /tmp/rpms/*.rpm
 
+# Configure and start CrowdStrike Falcon if a CID is provided
+CROWDSTRIKE_CID="{crowdstrike_cid}"
+if [[ -n "${CROWDSTRIKE_CID}" ]]; then
+  if [[ ! "${CROWDSTRIKE_CID}" =~ ^[0-9A-Fa-f]{32}-[0-9A-Fa-f]{2}$ ]]; then
+    echo "ERROR: Invalid CrowdStrike Customer ID format: '${CROWDSTRIKE_CID}'."
+    exit 1
+  fi
+
+  echo "Downloading CrowdStrike Falcon..."
+  aws s3 cp "s3://{crowdstrike_bucket}/{crowdstrike_key}" /tmp/falcon-sensor.rpm
+  echo "{crowdstrike_sha256}  /tmp/falcon-sensor.rpm" | sha256sum --check
+
+  sudo dnf install --disablerepo="*" /tmp/falcon-sensor.rpm -y
+  sudo /opt/CrowdStrike/falconctl -s --cid="${CROWDSTRIKE_CID}"
+  sudo systemctl enable falcon-sensor
+  sudo /opt/CrowdStrike/falconctl -d -f --aid
+  rm -f /tmp/falcon-sensor.rpm
+fi
+
 # Install Fluent Bit via package manager
 sudo yum install fluent-bit -y
 

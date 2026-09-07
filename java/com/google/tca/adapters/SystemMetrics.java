@@ -53,6 +53,7 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
   private final AtomicBoolean rootCertificateValiditySecondsRegistered = new AtomicBoolean(false);
   private final Counter[] jwksCacheLookupCounter;
   private final Timer jwksFetchTimer;
+  private final Timer oidcAuthenticationTimer;
   private final Timer[] subOperationTimers;
 
   @Inject
@@ -68,6 +69,10 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
     this.jwksFetchTimer =
         Timer.builder(PREFIX + "oidc_jwks_fetch_time")
             .description("Time spent fetching OIDC JWKS keys")
+            .register(registry);
+    this.oidcAuthenticationTimer =
+        Timer.builder(PREFIX + "oidc_authentication_time")
+            .description("Time spent performing OIDC JWT authentication in JwtInterceptor")
             .register(registry);
     this.subOperationTimers =
         createTimers(PREFIX + "issuance_operation_time", "operation", IssuanceSubOperation.class);
@@ -157,6 +162,13 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
   public void recordOidcJwksFetchTime(Duration duration) {
     if (duration != null) {
       jwksFetchTimer.record(duration);
+    }
+  }
+
+  @Override
+  public void recordOidcAuthenticationTime(Duration duration) {
+    if (duration != null) {
+      oidcAuthenticationTimer.record(duration);
     }
   }
 

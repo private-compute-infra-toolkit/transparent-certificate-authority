@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.9.0 (2026-09-07)
+
+
+### Dependencies
+
+* **deps:** Update api to release-0.6.0
+* **deps:** Update container-tools to release-0.8.0
+* **deps:** Update DevKit to release-3.11.0
+* **deps:** Update Oak to 6125602 for new PES endorsement format
+
+
+### Features
+
+* add OIDC authentication latency timer
+* Remove support for policy v1
+
+
+### Bug Fixes
+
+* **kokoro:** add retry logic to AMI building in build_ami.sh
+
 ## 0.8.0 (2026-07-24)
 
 

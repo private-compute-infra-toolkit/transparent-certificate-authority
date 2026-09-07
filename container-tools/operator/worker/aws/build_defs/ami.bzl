@@ -28,6 +28,11 @@ def _packer_worker_ami_impl(ctx):
     packer_file = ctx.actions.declare_file("%s_packer.pkr.hcl" % ctx.label.name)
     licenses_tar = ctx.file.licenses
     user_rpms = ctx.files.user_rpms
+    crowdstrike_cid = ctx.attr.crowdstrike_cid[BuildSettingInfo].value
+    crowdstrike_bucket = ctx.attr.crowdstrike_bucket[BuildSettingInfo].value
+    crowdstrike_key = ctx.attr.crowdstrike_key[BuildSettingInfo].value
+    crowdstrike_sha256 = ctx.attr.crowdstrike_sha256[BuildSettingInfo].value
+    pcit_packer_iam_instance_profile = ctx.attr.pcit_packer_iam_instance_profile[BuildSettingInfo].value
 
     ec2_provision_script = ctx.actions.declare_file(
         "%s_ec2_startup.sh" % ctx.label.name,
@@ -41,6 +46,10 @@ def _packer_worker_ami_impl(ctx):
         output = ec2_provision_script,
         substitutions = {
             "{container_file}": ctx.attr.enclave_container_image.label.name,
+            "{crowdstrike_bucket}": crowdstrike_bucket,
+            "{crowdstrike_cid}": crowdstrike_cid,
+            "{crowdstrike_key}": crowdstrike_key,
+            "{crowdstrike_sha256}": crowdstrike_sha256,
             "{docker_repo}": ctx.attr.enclave_container_image.label.package,
             "{docker_tag}": ctx.attr.enclave_container_image.label.name.replace(".tar", ""),
         },
@@ -78,6 +87,7 @@ def _packer_worker_ami_impl(ctx):
             "{enable_worker_debug_mode}": "true" if ctx.attr.enable_worker_debug_mode else "false",
             "{enclave_allocator}": allocator_file_expanded.short_path,
             "{licenses}": licenses_tar.short_path,
+            "{pcit_packer_iam_instance_profile}": pcit_packer_iam_instance_profile,
             "{provision_script}": ec2_provision_script.short_path,
             "{rpms}": '["' + '","'.join(rpm_list) + '"]',
             "{subnet_id}": ctx.attr.subnet_id[BuildSettingInfo].value,
@@ -136,6 +146,22 @@ packer_worker_ami = rule(
             mandatory = True,
             providers = [BuildSettingInfo],
         ),
+        "crowdstrike_bucket": attr.label(
+            default = Label("//build_defs:crowdstrike_bucket"),
+            providers = [BuildSettingInfo],
+        ),
+        "crowdstrike_cid": attr.label(
+            default = Label("//build_defs:crowdstrike_cid"),
+            providers = [BuildSettingInfo],
+        ),
+        "crowdstrike_key": attr.label(
+            default = Label("//build_defs:crowdstrike_key"),
+            providers = [BuildSettingInfo],
+        ),
+        "crowdstrike_sha256": attr.label(
+            default = Label("//build_defs:crowdstrike_sha256"),
+            providers = [BuildSettingInfo],
+        ),
         "ec2_instance": attr.string(
             mandatory = True,
             default = "m5.xlarge",
@@ -170,6 +196,10 @@ packer_worker_ami = rule(
             executable = True,
             cfg = "exec",
             allow_single_file = True,
+        ),
+        "pcit_packer_iam_instance_profile": attr.label(
+            default = Label("//build_defs:pcit_packer_iam_instance_profile"),
+            providers = [BuildSettingInfo],
         ),
         "proxy_rpm": attr.label(
             default = Label("//cc/aws/proxy:vsockproxy_rpm"),

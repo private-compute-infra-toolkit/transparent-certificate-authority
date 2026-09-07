@@ -46,7 +46,6 @@ public class FileSourcedPolicyProviderTest {
   public static Collection<Object[]> data() {
     return Arrays.asList(
         new Object[][] {
-          {"javatests/com/google/tca/adapters/resources/policy/v1/test_policies.textproto"},
           {"javatests/com/google/tca/adapters/resources/policy/v2/test_policies.textproto"}
         });
   }
