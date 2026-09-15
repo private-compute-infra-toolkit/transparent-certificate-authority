@@ -65,6 +65,6 @@ java_library(
         "@oak//proto:variant_java_proto",
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )

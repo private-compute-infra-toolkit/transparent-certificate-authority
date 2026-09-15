@@ -21,6 +21,8 @@ import com.beust.jcommander.ParameterException;
 import com.google.common.flogger.FluentLogger;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.mbs.domain.CertificateMonitor;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
 /** An Armeria server that hosts the TransparentCaService with gRPC and REST support. */
@@ -30,14 +32,8 @@ public class ServerMain {
   public static void main(String[] args) throws Exception {
     HelpArgs helpArgs = new HelpArgs();
     KmsArgs kmsArgs = new KmsArgs();
-    LocalArgs localArgs = new LocalArgs();
 
-    JCommander jc =
-        JCommander.newBuilder()
-            .addObject(helpArgs)
-            .addCommand(kmsArgs)
-            .addCommand(localArgs)
-            .build();
+    JCommander jc = JCommander.newBuilder().addObject(helpArgs).addCommand(kmsArgs).build();
     jc.setProgramName("server_main");
     try {
       jc.parse(args);
@@ -51,19 +47,7 @@ public class ServerMain {
       return;
     }
 
-    String parsedCommand = jc.getParsedCommand();
-    Injector injector;
-    if (LocalArgs.COMMAND_NAME.equals(parsedCommand)) {
-      logger.atInfo().log("Starting in Local Mode");
-      injector = Guice.createInjector(new TransparentCaModule(), new LocalModeModule(localArgs));
-    } else if (KmsArgs.COMMAND_NAME.equals(parsedCommand)) {
-      logger.atInfo().log("Starting in KMS Mode");
-      injector = Guice.createInjector(new TransparentCaModule(), new KmsModeModule(kmsArgs));
-    } else {
-      logger.atInfo().log(
-          "No command specified. Defaulting to KMS Mode with default configuration.");
-      injector = Guice.createInjector(new TransparentCaModule(), new KmsModeModule(kmsArgs));
-    }
+    Injector injector = Guice.createInjector(new TransparentCaModule(), new KmsModeModule(kmsArgs));
 
     TransparentCertificateAuthorityGrpcHandler service =
         injector.getInstance(TransparentCertificateAuthorityGrpcHandler.class);
@@ -75,9 +59,15 @@ public class ServerMain {
         injector.getInstance(CertificateValidityReporter.class);
     validityReporter.startAsync();
 
+    CertificateMonitor certMonitor = injector.getInstance(CertificateMonitor.class);
+    certMonitor.start();
+
+    MeasurementBoundCertificateProvider certProvider =
+        injector.getInstance(MeasurementBoundCertificateProvider.class);
+
     int port = 50051;
     TcaServer tcaServer =
-        new TcaServer(port, service, legacyService, jwtInterceptor, meterRegistry);
+        new TcaServer(port, service, legacyService, jwtInterceptor, meterRegistry, certProvider);
 
     tcaServer.start().join();
 
@@ -89,6 +79,7 @@ public class ServerMain {
                 System.err.println("*** shutting down Armeria server since JVM is shutting down");
                 tcaServer.stop().join();
                 validityReporter.stopAsync();
+                certMonitor.stop();
                 System.err.println("*** server shut down");
               }
             });

@@ -20,6 +20,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
 import java.security.cert.X509Certificate;
@@ -49,7 +51,9 @@ public class CertificateValidityReporterTest {
 
   @Before
   public void setUp() {
-    reporter = new CertificateValidityReporter(mockCertificate, mockMetrics, mockTimeProvider);
+    MeasurementBoundCertificateProvider certificateProvider =
+        () -> new MeasurementBoundCertificate(mockCertificate, null, null);
+    reporter = new CertificateValidityReporter(certificateProvider, mockMetrics, mockTimeProvider);
   }
 
   @Test

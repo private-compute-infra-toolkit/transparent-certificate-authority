@@ -17,11 +17,14 @@
 package com.google.tca.adapters;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.mbs.domain.Metrics.ReloadStatus.FAILURE;
+import static com.google.mbs.domain.Metrics.ReloadStatus.SUCCESS;
 
 import com.google.tca.domain.metric.IssuanceSubOperation;
 import com.google.tca.domain.metric.JwksCacheResult;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.time.Duration;
@@ -245,5 +248,18 @@ public class SystemMetricsTest {
 
     assertThat(count).isEqualTo(1.0);
     assertThat(totalTimeSecs).isWithin(0.01).of(0.150);
+  }
+
+  @Test
+  public void setReloadStatus_updatesGaugeValue() {
+    Gauge gauge = registry.get("tca.certificate_reload_failed").gauge();
+    assertThat(gauge).isNotNull();
+    assertThat(gauge.value()).isEqualTo(0.0);
+
+    systemMetrics.setReloadStatus(FAILURE);
+    assertThat(gauge.value()).isEqualTo(1.0);
+
+    systemMetrics.setReloadStatus(SUCCESS);
+    assertThat(gauge.value()).isEqualTo(0.0);
   }
 }

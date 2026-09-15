@@ -42,6 +42,7 @@ public class ImdsClient {
       JsonObject identityDocument = gson.fromJson(docString, JsonObject.class);
       String region = identityDocument.get("region").getAsString();
       String accountId = identityDocument.get("accountId").getAsString();
+      String instanceId = identityDocument.get("instanceId").getAsString();
 
       String environment = client.get(ENVIRONMENT_TAG_PATH).asString();
       String domain = client.get(DOMAIN_TAG_PATH).asString();
@@ -51,6 +52,7 @@ public class ImdsClient {
           .setAccountId(accountId)
           .setEnvironment(environment)
           .setDomain(domain)
+          .setInstanceId(instanceId)
           .build();
     } catch (Exception e) {
       throw new RuntimeException("Failed to fetch EC2 Instance Identity Document via IMDS.", e);

@@ -20,5 +20,5 @@ import com.google.tca.domain.policy.Policy;
 import java.util.List;
 
 public interface CertificateModifiersCreator {
-  List<CertificateModifier> create(Policy policy);
+  List<CertificateModifier> create(Policy policy, String trustDomain);
 }

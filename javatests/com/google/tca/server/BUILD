@@ -128,8 +128,7 @@ java_test(
         "@maven//:org_mockito_mockito_core",
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
-        "@pcit_mbs//java/com/google/mbs/attestationcollection",
+        "@pcit_mbs//java/com/google/mbs",
     ],
 )
 
@@ -185,8 +184,7 @@ java_test(
         "@maven//:software_amazon_awssdk_sdk_core",
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
-        "@pcit_mbs//java/com/google/mbs/attestationcollection",
+        "@pcit_mbs//java/com/google/mbs",
     ],
 )
 
@@ -207,10 +205,7 @@ java_test(
         "@maven//:org_mockito_mockito_core",
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",
-        "@pcit_mbs//java/com/google/kmsclient",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
-        "@pcit_mbs//java/com/google/mbs:module",
-        "@pcit_mbs//java/com/google/mbs/attestationcollection",
+        "@pcit_mbs//java/com/google/mbs",
     ],
 )
 
@@ -241,7 +236,7 @@ java_test(
         "//java/com/google/tca/domain/attestation",
         "//java/com/google/tca/domain/policy",
         "//java/com/google/tca/server",
-        "//java/com/google/tca/server:cmd_line_args",
+        "//java/com/google/tca/server:metadata",
         "@com_google_protobuf//:protobuf_javalite",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_inject_guice",
@@ -253,7 +248,7 @@ java_test(
         "@maven//:org_mockito_mockito_core",
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
+        "@pcit_mbs//java/com/google/mbs",
     ],
 )
 
@@ -269,5 +264,22 @@ java_test(
         "@maven//:com_google_truth_truth",
         "@maven//:junit_junit",
         "@maven//:org_mockito_mockito_core",
+        "@pcit_mbs//java/com/google/mbs/domain",
+    ],
+)
+
+java_test(
+    name = "TcaServerTest",
+    size = "small",
+    srcs = ["TcaServerTest.java"],
+    deps = [
+        "//java/com/google/tca/server",
+        "@io_grpc_grpc_java//api",
+        "@maven//:com_google_truth_truth",
+        "@maven//:com_linecorp_armeria_armeria",
+        "@maven//:io_micrometer_micrometer_registry_prometheus",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )

@@ -25,8 +25,7 @@ java_library(
         "S3TestClient.java",
     ],
     deps = [
-        "//java/com/google/kmsclient",
-        "//java/com/google/mbs/attestationcollection",
+        "//java/com/google/mbs/domain",
         "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",

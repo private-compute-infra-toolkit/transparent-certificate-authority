@@ -50,7 +50,7 @@ def tca_aws_eif_and_ami(
     """
     default_additional_container_tars = [
         "//java/com/google/tca/attestation/oak/jni:oak_attestation_verifier_jni_tar",
-        "@pcit_mbs//java/com/google/platform/aws/nsm:nsm_jni_tar",
+        "@pcit_mbs//java/com/google/mbs:nsm_jni_tar",
     ]
 
     default_jvm_options = [

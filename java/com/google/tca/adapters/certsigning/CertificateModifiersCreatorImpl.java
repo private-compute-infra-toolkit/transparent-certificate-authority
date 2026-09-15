@@ -18,7 +18,6 @@ package com.google.tca.adapters.certsigning;
 
 import com.google.tca.domain.CertificateModifier;
 import com.google.tca.domain.CertificateModifiersCreator;
-import com.google.tca.domain.TrustDomain;
 import com.google.tca.domain.policy.BasicConstraints;
 import com.google.tca.domain.policy.NameConstraints;
 import com.google.tca.domain.policy.Policy;
@@ -30,15 +29,11 @@ import java.util.List;
 @Singleton
 public class CertificateModifiersCreatorImpl implements CertificateModifiersCreator {
 
-  private final String trustDomain;
-
   @Inject
-  public CertificateModifiersCreatorImpl(@TrustDomain String trustDomain) {
-    this.trustDomain = trustDomain;
-  }
+  public CertificateModifiersCreatorImpl() {}
 
   @Override
-  public List<CertificateModifier> create(Policy policy) {
+  public List<CertificateModifier> create(Policy policy, String trustDomain) {
     List<CertificateModifier> modifiers = new ArrayList<>();
 
     if (policy.certificateAttributes().extensions().nameConstraints().isPresent()) {

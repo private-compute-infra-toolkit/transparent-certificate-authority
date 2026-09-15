@@ -47,7 +47,7 @@ public class CertificateModifiersCreatorImplTest {
 
   @Before
   public void setUp() {
-    creator = new CertificateModifiersCreatorImpl("tca.local.test");
+    creator = new CertificateModifiersCreatorImpl();
   }
 
   @Test
@@ -73,7 +73,7 @@ public class CertificateModifiersCreatorImplTest {
                     new X500NameAttributes(Map.of())))
             .build();
 
-    List<CertificateModifier> modifiers = creator.create(policy);
+    List<CertificateModifier> modifiers = creator.create(policy, "tca.local.test");
 
     assertThat(modifiers).hasSize(4);
     assertThat(modifiers.get(0)).isInstanceOf(NameConstraintsModifier.class);

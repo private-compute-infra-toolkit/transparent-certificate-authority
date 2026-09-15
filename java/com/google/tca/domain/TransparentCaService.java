@@ -35,7 +35,8 @@ import static com.google.tca.domain.metric.ProcessingStatus.SIGNING_ERROR;
 import static com.google.tca.domain.metric.ProcessingStatus.SUCCESS;
 
 import com.google.common.flogger.FluentLogger;
-import com.google.mbs.qualifier.MbsRoot;
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
@@ -63,8 +64,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 public class TransparentCaService {
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
-  private final X509Certificate rootCertificate;
-  private final PrivateKey privateKey;
+  private final MeasurementBoundCertificateProvider certificateProvider;
   private final AttestationVerifierProvider verifierProvider;
   private final CertificateSigner certificateSigner;
   private final KeyDecoder keyDecoder;
@@ -77,8 +77,7 @@ public class TransparentCaService {
 
   @Inject
   public TransparentCaService(
-      @MbsRoot X509Certificate rootCertificate,
-      @MbsRoot PrivateKey privateKey,
+      MeasurementBoundCertificateProvider certificateProvider,
       AttestationVerifierProvider verifierProvider,
       CertificateSigner certificateSigner,
       KeyDecoder keyDecoder,
@@ -88,8 +87,7 @@ public class TransparentCaService {
       CertificateModifiersCreator certificateModifiersCreator,
       AudienceBindingValidator audienceBindingValidator,
       Metrics metrics) {
-    this.rootCertificate = rootCertificate;
-    this.privateKey = privateKey;
+    this.certificateProvider = certificateProvider;
     this.verifierProvider = verifierProvider;
     this.certificateSigner = certificateSigner;
     this.keyDecoder = keyDecoder;
@@ -115,8 +113,19 @@ public class TransparentCaService {
       timer.recordSubOperationAndResetTimer(EXTRACT_PUBLIC_KEY);
     }
 
+    MeasurementBoundCertificate mbc = certificateProvider.getCertificate();
+    X509Certificate rootCertificate = mbc.getCertificate();
+    PrivateKey privateKey = mbc.getPrivateKey();
+    String trustDomain;
     try {
-      audienceBindingValidator.validate(csrPublicKey, callerIdentity);
+      trustDomain = TrustDomainExtractor.extract(rootCertificate);
+    } catch (CertificateException | java.net.URISyntaxException | IllegalArgumentException e) {
+      metrics.incrementProcessingCounter(SIGNING_ERROR);
+      throw new CertificateException("Failed to extract trust domain from root certificate", e);
+    }
+
+    try {
+      audienceBindingValidator.validate(csrPublicKey, callerIdentity, trustDomain);
     } catch (AudienceValidationException e) {
       metrics.incrementProcessingCounter(AUDIENCE_MISMATCH);
       throw e;
@@ -174,7 +183,7 @@ public class TransparentCaService {
       throw new IllegalArgumentException("Incorrect certificate validity");
     }
 
-    List<CertificateModifier> modifiers = certificateModifiersCreator.create(policy);
+    List<CertificateModifier> modifiers = certificateModifiersCreator.create(policy, trustDomain);
     X509Certificate signedCertificate;
     try {
       signedCertificate =

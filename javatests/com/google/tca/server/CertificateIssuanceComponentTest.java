@@ -27,10 +27,12 @@ import com.google.common.io.BaseEncoding;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.util.Modules;
-import com.google.mbs.qualifier.MbsRoot;
+import com.google.mbs.MbsCertificateFactory;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
 import com.google.tca.adapters.OakAttestationEvidence;
@@ -43,23 +45,23 @@ import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.policy.ReferenceValues;
 import jakarta.inject.Singleton;
-import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.Security;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -67,7 +69,9 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.GeneralSubtree;
+import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.NameConstraints;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -97,17 +101,9 @@ public class CertificateIssuanceComponentTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath = Files.createTempFile("test_tca_config", ".json");
-    try (InputStream in =
-        CertificateIssuanceComponentTest.class.getResourceAsStream(
-            "/com/google/tca/server/testdata/test_tca_config.json")) {
-      Files.copy(in, configPath, StandardCopyOption.REPLACE_EXISTING);
+    if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+      Security.addProvider(new BouncyCastleProvider());
     }
-
-    LocalArgs localArgs = new LocalArgs();
-    java.lang.reflect.Field field = LocalArgs.class.getDeclaredField("configPath");
-    field.setAccessible(true);
-    field.set(localArgs, configPath.toString());
 
     mockVerifier = mock(AttestationVerifier.class);
     mockTimeProvider = mock(TimeProvider.class);
@@ -125,6 +121,24 @@ public class CertificateIssuanceComponentTest {
                         readTestFile(
                             "javatests/com/google/tca/server/testdata/reference_values.textproto"))));
 
+    MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
+        MbsCertificateFactory.createSelfSignedCertificatesFactory(
+                new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
+                new X500Name("CN=TCA Local"),
+                Duration.ofDays(180),
+                Optional.of(
+                    new GeneralNames(
+                        new GeneralName(
+                            GeneralName.uniformResourceIdentifier, "spiffe://tca.local.test"))),
+                KeyUsage.keyCertSign)
+            .generate();
+
+    MeasurementBoundCertificate cert =
+        new MeasurementBoundCertificate(
+            certAndKey.certificate(),
+            certAndKey.privateKey(),
+            AttestationToken.fromBytes("DummyToken".getBytes()));
+
     Injector injector =
         Guice.createInjector(
             Modules.override(new TransparentCaModule())
@@ -134,6 +148,16 @@ public class CertificateIssuanceComponentTest {
                       protected void configure() {
                         bind(FileFetcher.class).toInstance(fileFetcher);
                         bind(TimeProvider.class).toInstance(mockTimeProvider);
+                        bind(MeasurementBoundCertificateProvider.class).toInstance(() -> cert);
+                        bind(AwsInstanceMetadata.class)
+                            .toInstance(
+                                AwsInstanceMetadata.builder()
+                                    .setRegion("local")
+                                    .setAccountId("dummy_account")
+                                    .setEnvironment("local")
+                                    .setDomain("pcit.goog")
+                                    .setInstanceId("local-instance")
+                                    .build());
                       }
 
                       @Provides
@@ -142,11 +166,14 @@ public class CertificateIssuanceComponentTest {
                           provideVerifiers() {
                         return Collections.singletonMap(OakAttestationEvidence.class, mockVerifier);
                       }
-                    }),
-            new LocalModeModule(localArgs));
+                    }));
 
     transparentCaService = injector.getInstance(TransparentCaService.class);
-    rootCertificate = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
+    rootCertificate =
+        injector
+            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getCertificate()
+            .getCertificate();
   }
 
   @Test

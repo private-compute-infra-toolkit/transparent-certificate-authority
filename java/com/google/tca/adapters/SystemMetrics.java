@@ -17,7 +17,7 @@
 package com.google.tca.adapters;
 
 import com.google.common.flogger.FluentLogger;
-import com.google.mbs.Metrics.MbsEvent;
+import com.google.mbs.domain.Metrics.MbsEvent;
 import com.google.tca.domain.metric.IssuanceSubOperation;
 import com.google.tca.domain.metric.JwksCacheResult;
 import com.google.tca.domain.metric.Metrics;
@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Singleton
-public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
+public class SystemMetrics implements Metrics, com.google.mbs.domain.Metrics {
 
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
   private static final String PREFIX = "tca.";
@@ -51,6 +51,7 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
   private final ConcurrentHashMap<String, Counter> issuanceCounters = new ConcurrentHashMap<>();
   private final AtomicLong rootCertificateValiditySeconds = new AtomicLong(0);
   private final AtomicBoolean rootCertificateValiditySecondsRegistered = new AtomicBoolean(false);
+  private final AtomicInteger certificateReloadFailed = new AtomicInteger(0);
   private final Counter[] jwksCacheLookupCounter;
   private final Timer jwksFetchTimer;
   private final Timer oidcAuthenticationTimer;
@@ -64,6 +65,9 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
     this.processingCounter =
         createCounters(PREFIX + "processingStatus", "status", ProcessingStatus.class);
     this.mbsStatusValues = createGauges(PREFIX + "mbsStatus", "status", MbsEvent.class);
+    Gauge.builder(PREFIX + "certificate_reload_failed", certificateReloadFailed, AtomicInteger::get)
+        .description("Indicates whether certificate reloading failed (0: success, 1: failed)")
+        .register(registry);
     this.jwksCacheLookupCounter =
         createCounters(PREFIX + "oidc_jwks_cache_lookups", "result", JwksCacheResult.class);
     this.jwksFetchTimer =
@@ -133,6 +137,12 @@ public class SystemMetrics implements Metrics, com.google.mbs.Metrics {
         mbsStatusValues[e.ordinal()].set(e == event ? 1 : 0);
       }
     }
+  }
+
+  @Override
+  public void setReloadStatus(com.google.mbs.domain.Metrics.ReloadStatus status) {
+    certificateReloadFailed.set(
+        status == com.google.mbs.domain.Metrics.ReloadStatus.FAILURE ? 1 : 0);
   }
 
   @Override

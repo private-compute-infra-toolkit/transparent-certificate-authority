@@ -22,8 +22,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.MbsModule;
-import com.google.mbs.Metrics;
+import com.google.mbs.domain.Metrics;
 import com.google.mbs.qualifier.AttestationUserData;
+import com.google.mbs.qualifier.InstanceId;
 import com.google.mbs.qualifier.KmsKeyArn;
 import com.google.mbs.qualifier.PrivateBackupBucket;
 import com.google.mbs.qualifier.PublicBackupBucket;
@@ -81,6 +82,13 @@ public class KmsModeModule extends AbstractModule {
     Region region = Region.of(awsInstanceMetadata.region());
     logger.atInfo().log("Initializing S3Client with AWS region: %s", region.toString());
     return S3Client.builder().region(region).build();
+  }
+
+  @Provides
+  @Singleton
+  @InstanceId
+  String provideInstanceId() {
+    return awsInstanceMetadata.instanceId();
   }
 
   @Provides

@@ -49,6 +49,7 @@ public class AwsResourceNamesProviderTest {
             .setAccountId("123456789012")
             .setEnvironment("dev")
             .setDomain("pcit.goog")
+            .setInstanceId("i-testinstance")
             .build();
     provider = new AwsResourceNamesProvider(mockKmsArgs, awsInstanceMetadata);
   }

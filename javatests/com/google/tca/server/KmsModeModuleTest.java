@@ -43,6 +43,7 @@ public class KmsModeModuleTest {
             .setAccountId("123456789012")
             .setEnvironment(testEnv)
             .setDomain(testDomain)
+            .setInstanceId("i-0123456789abcdef0")
             .build();
     KmsArgs kmsArgs = new KmsArgs();
     KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
@@ -82,6 +83,7 @@ public class KmsModeModuleTest {
             .setAccountId("123456789012")
             .setEnvironment(testEnv)
             .setDomain(testDomain)
+            .setInstanceId("i-0123456789abcdef0")
             .build();
     KmsArgs kmsArgs = new KmsArgs();
     KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
@@ -108,5 +110,22 @@ public class KmsModeModuleTest {
     GeneralName sanEntry = names.getNames()[0];
     assertThat(sanEntry.getTagNo()).isEqualTo(GeneralName.uniformResourceIdentifier);
     assertThat(sanEntry.getName().toString()).isEqualTo(expectedSpiffeId);
+  }
+
+  @Test
+  public void provideInstanceId_returnsConfiguredInstanceId() {
+    String testInstanceId = "i-0123456789abcdef0";
+    AwsInstanceMetadata awsInstanceMetadata =
+        AwsInstanceMetadata.builder()
+            .setRegion("us-east-1")
+            .setAccountId("123456789012")
+            .setEnvironment("test")
+            .setDomain("pcit.goog")
+            .setInstanceId(testInstanceId)
+            .build();
+    KmsArgs kmsArgs = new KmsArgs();
+    KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
+
+    assertThat(module.provideInstanceId()).isEqualTo(testInstanceId);
   }
 }

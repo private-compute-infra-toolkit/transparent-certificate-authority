@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.9.0 (2026-09-14)
+
+
+### Features
+
+* Decouple getCertificate from certificate reload logic
+
+## 0.8.0 (2026-09-14)
+
+
+### Features
+
+* Emit WAITING_FOR_MBS_LOCK on root certificate lock contention
+
+## 0.7.0 (2026-09-08)
+
+
+### Features
+
+* Add dedicated reload status metric to Metrics
+* Add periodic certificate monitor service
+* Exclusive root certificate generation with S3 distributed lock
+* Export nsm_jni_tar packaging target at mbs root
+* Record instance ID in root certificate generation lock
+* Support live certificate reloading and atomic key-pair access
+
 ## 0.6.0 (2026-08-31)
 
 

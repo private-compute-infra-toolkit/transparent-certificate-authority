@@ -116,6 +116,7 @@ java_test(
         "@maven//:io_micrometer_micrometer_core",
         "@maven//:io_micrometer_micrometer_registry_prometheus",
         "@maven//:junit_junit",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )
 

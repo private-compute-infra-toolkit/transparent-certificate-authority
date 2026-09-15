@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.FluentLogger;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.google.mbs.qualifier.MbsRoot;
 import com.google.tca.adapters.AttestationVerifierProviderImpl;
 import com.google.tca.adapters.AwsAttestationEvidence;
 import com.google.tca.adapters.CachedFileFetcher;
@@ -54,8 +53,6 @@ import com.google.tca.domain.FileFetcher;
 import com.google.tca.domain.KeyDecoder;
 import com.google.tca.domain.PolicyProvider;
 import com.google.tca.domain.TimeProvider;
-import com.google.tca.domain.TrustDomain;
-import com.google.tca.domain.TrustDomainExtractor;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
@@ -70,7 +67,6 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import jakarta.inject.Singleton;
 import java.net.http.HttpClient;
 import java.security.Key;
-import java.security.cert.X509Certificate;
 import java.time.InstantSource;
 import java.util.Map;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -184,13 +180,5 @@ public class TransparentCaModule extends AbstractModule {
     new JvmThreadMetrics().bindTo(registry);
     new ProcessorMetrics().bindTo(registry);
     return registry;
-  }
-
-  @Provides
-  @Singleton
-  @TrustDomain
-  String provideTrustDomain(@MbsRoot X509Certificate rootCertificate)
-      throws java.security.cert.CertificateParsingException, java.net.URISyntaxException {
-    return TrustDomainExtractor.extract(rootCertificate);
   }
 }

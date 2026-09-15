@@ -21,7 +21,6 @@ import com.google.common.io.BaseEncoding;
 import com.google.tca.domain.AudienceBindingValidator;
 import com.google.tca.domain.AudienceValidationException;
 import com.google.tca.domain.CallerIdentity;
-import com.google.tca.domain.TrustDomain;
 import com.google.tca.server.AwsInstanceMetadata;
 import jakarta.inject.Inject;
 import java.security.MessageDigest;
@@ -37,18 +36,15 @@ public final class OidcAudienceBindingValidator implements AudienceBindingValida
   private static final Pattern AUDIENCE_PATTERN =
       Pattern.compile("^https://([^/]+)/v1/certificates:issue\\?pubkey_sha256=([a-f0-9]{64})$");
 
-  private final String trustDomain;
   private final AwsInstanceMetadata metadata;
 
   @Inject
-  public OidcAudienceBindingValidator(
-      @TrustDomain String trustDomain, AwsInstanceMetadata metadata) {
-    this.trustDomain = trustDomain;
+  public OidcAudienceBindingValidator(AwsInstanceMetadata metadata) {
     this.metadata = metadata;
   }
 
   @Override
-  public void validate(PublicKey csrPublicKey, CallerIdentity callerIdentity) {
+  public void validate(PublicKey csrPublicKey, CallerIdentity callerIdentity, String trustDomain) {
     logger.atInfo().log("OIDC Audience validation using trust domain: %s", trustDomain);
 
     String expectedDigest = getExpectedDigest(csrPublicKey);
@@ -60,7 +56,7 @@ public final class OidcAudienceBindingValidator implements AudienceBindingValida
         String hostname = matcher.group(1);
         String digest = matcher.group(2);
 
-        if (digest.equals(expectedDigest) && isValidHostname(hostname)) {
+        if (digest.equals(expectedDigest) && isValidHostname(hostname, trustDomain)) {
           return;
         }
       }
@@ -74,7 +70,7 @@ public final class OidcAudienceBindingValidator implements AudienceBindingValida
     throw new AudienceValidationException("OIDC audience binding validation failed.");
   }
 
-  private boolean isValidHostname(String hostname) {
+  private boolean isValidHostname(String hostname, String trustDomain) {
     if (hostname.equals(trustDomain)) {
       return true;
     }

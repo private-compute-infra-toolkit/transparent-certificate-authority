@@ -21,11 +21,12 @@ import java.security.PublicKey;
 /** Interface for audience binding validation logic. */
 public interface AudienceBindingValidator {
   /**
-   * Validates that the public key is correctly bound to the caller's identity.
+   * Validates that the public key is correctly bound to the caller's identity and trust domain.
    *
    * @param csrPublicKey the public key from the CSR.
    * @param callerIdentity the identity of the caller.
+   * @param trustDomain the active trust domain extracted from the root certificate.
    * @throws AudienceValidationException if validation fails.
    */
-  void validate(PublicKey csrPublicKey, CallerIdentity callerIdentity);
+  void validate(PublicKey csrPublicKey, CallerIdentity callerIdentity, String trustDomain);
 }

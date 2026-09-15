@@ -16,7 +16,10 @@
 
 package com.google.mbs;
 
-import com.google.mbs.attestationcollection.AttestationToken;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.MeasurementBoundCertificateReloader;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.X509Certificate;
@@ -30,26 +33,31 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
-/** In-memory, placeholder implementation of MeasurementBoundCertificateProfider. */
+/** In-memory, placeholder implementation of MeasurementBoundCertificateProvider. */
 public class DummyMeasurementBoundCertificateProvider
-    implements MeasurementBoundCertificateProvider {
+    implements MeasurementBoundCertificateProvider, MeasurementBoundCertificateReloader {
   // RFC 5280 limits the serial number to 20 bytes (160 bits).
   // A positive BigInteger requires 1 bit for the sign, leaving 159 bits for entropy.
   private static final int SERIAL_NUMBER_ENTROPY_BITS = 159;
 
   private static final SecureRandom secureRandom = new SecureRandom();
-  private MeasurementBoundCertificate mbc = null;
+  private volatile MeasurementBoundCertificate mbc = null;
 
   @Override
-  public synchronized MeasurementBoundCertificate loadOrGenerateCertificate() {
-    if (mbc != null) {
-      return mbc;
+  public MeasurementBoundCertificate getCertificate() {
+    MeasurementBoundCertificate cert = mbc;
+    if (cert == null) {
+      throw new IllegalStateException("Measurement-bound certificate has not been initialized yet");
     }
+    return cert;
+  }
+
+  @Override
+  public synchronized void reloadCertificate() {
     try {
       mbc = generateNewCertificate();
-      return mbc;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to generate certificate", e);
+      throw new RuntimeException("Failed to reload certificate", e);
     }
   }
 

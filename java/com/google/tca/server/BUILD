@@ -31,7 +31,6 @@ java_library(
     srcs = [
         "HelpArgs.java",
         "KmsArgs.java",
-        "LocalArgs.java",
     ],
     visibility = [
         "//javatests/com/google/tca/server:__subpackages__",
@@ -51,7 +50,6 @@ java_library(
         "JwtAuth.java",
         "JwtInterceptor.java",
         "KmsModeModule.java",
-        "LocalModeModule.java",
         "TcaServer.java",
         "TransparentCaModule.java",
         "TransparentCertificateAuthorityGrpcHandler.java",
@@ -106,13 +104,7 @@ java_library(
         "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_s3",
         "@oak//proto/attestation:reference_value_java_proto",
-        "@pcit_mbs//java/com/google/kmsclient",
-        "@pcit_mbs//java/com/google/kmsclient/aws",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
-        "@pcit_mbs//java/com/google/mbs:dummy_cert_provider",
-        "@pcit_mbs//java/com/google/mbs:module",
-        "@pcit_mbs//java/com/google/mbs/attestationcollection",
-        "@pcit_mbs//java/com/google/mbs/attestationcollection/aws",
+        "@pcit_mbs//java/com/google/mbs",
     ],
 )
 
@@ -153,10 +145,7 @@ java_binary(
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_micrometer_micrometer_registry_prometheus",
         "@maven//:software_amazon_awssdk_s3",
-        "@pcit_mbs//java/com/google/kmsclient",
-        "@pcit_mbs//java/com/google/kmsclient/aws",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
-        "@pcit_mbs//java/com/google/mbs/attestationcollection/aws",
+        "@pcit_mbs//java/com/google/mbs",
     ],
 )
 

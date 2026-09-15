@@ -16,10 +16,17 @@
 
 package com.google.mbs;
 
+import com.google.mbs.domain.Metrics;
+
 /** A no-op implementation of {@link Metrics}. */
 public final class NoOpMetrics implements Metrics {
   @Override
   public void recordEvent(MbsEvent event) {
+    // No-op
+  }
+
+  @Override
+  public void setReloadStatus(ReloadStatus status) {
     // No-op
   }
 }

@@ -59,6 +59,7 @@
               "label_matcher": "^tca$",
               "dimensions": [[]],
               "metric_selectors": [
+                "^tca_certificate_reload_failed$",
                 "^tca_root_certificate_validity_seconds$",
                 "^tca_oidc_jwks_fetch_time_seconds_count$",
                 "^tca_oidc_jwks_fetch_time_seconds_sum$",

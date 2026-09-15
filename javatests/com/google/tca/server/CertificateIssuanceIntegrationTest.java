@@ -26,12 +26,11 @@ import static org.mockito.Mockito.when;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Key;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
-import com.google.mbs.MeasurementBoundCertificate;
-import com.google.mbs.attestationcollection.AttestationToken;
-import com.google.mbs.qualifier.MbsRoot;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.google.oak.attestation.v1.Endorsements;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
@@ -138,8 +137,6 @@ public class CertificateIssuanceIntegrationTest {
       java.security.Security.addProvider(new BouncyCastleProvider());
     }
 
-    LocalArgs localArgs = new LocalArgs();
-
     // Create the MeasurementBoundCertificate instance to be used as a singleton in the test
     MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
@@ -186,12 +183,8 @@ public class CertificateIssuanceIntegrationTest {
                         // Bind the specific instances
                         bind(MeasurementBoundCertificate.class)
                             .toInstance(measurementBoundCertificate);
-                        bind(X509Certificate.class)
-                            .annotatedWith(MbsRoot.class)
-                            .toInstance(measurementBoundCertificate.getCertificate());
-                        bind(java.security.PrivateKey.class)
-                            .annotatedWith(MbsRoot.class)
-                            .toInstance(measurementBoundCertificate.getPrivateKey());
+                        bind(MeasurementBoundCertificateProvider.class)
+                            .toInstance(() -> measurementBoundCertificate);
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
                             .annotatedWith(JwtAuth.class)
@@ -203,6 +196,7 @@ public class CertificateIssuanceIntegrationTest {
                                     .setAccountId("dummy_account")
                                     .setEnvironment("local")
                                     .setDomain("pcit.goog")
+                                    .setInstanceId("local-instance")
                                     .build());
                       }
                     }));
@@ -214,7 +208,12 @@ public class CertificateIssuanceIntegrationTest {
     JwtInterceptor jwtInterceptor = injector.getInstance(JwtInterceptor.class);
     PrometheusMeterRegistry meterRegistry = injector.getInstance(PrometheusMeterRegistry.class);
 
-    tcaServer = new TcaServer(ANY_PORT, service, legacyService, jwtInterceptor, meterRegistry);
+    MeasurementBoundCertificateProvider certProvider =
+        injector.getInstance(MeasurementBoundCertificateProvider.class);
+
+    tcaServer =
+        new TcaServer(
+            ANY_PORT, service, legacyService, jwtInterceptor, meterRegistry, certProvider);
     tcaServer.start().join();
 
     channel =
@@ -455,7 +454,11 @@ public class CertificateIssuanceIntegrationTest {
             cf.generateCertificate(
                 new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
 
-    X509Certificate rootCert = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
+    X509Certificate rootCert =
+        injector
+            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getCertificate()
+            .getCertificate();
 
     X509Certificate responseRootCert =
         (X509Certificate)
@@ -560,7 +563,11 @@ public class CertificateIssuanceIntegrationTest {
             cf.generateCertificate(
                 new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
 
-    X509Certificate rootCert = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
+    X509Certificate rootCert =
+        injector
+            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getCertificate()
+            .getCertificate();
 
     X509Certificate responseRootCert =
         (X509Certificate)

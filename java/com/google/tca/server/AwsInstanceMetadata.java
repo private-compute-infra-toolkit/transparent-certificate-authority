@@ -20,7 +20,7 @@ import com.google.auto.value.AutoBuilder;
 
 /** Immutable carrier for IMDS data. */
 public record AwsInstanceMetadata(
-    String region, String accountId, String environment, String domain) {
+    String region, String accountId, String environment, String domain, String instanceId) {
 
   public static Builder builder() {
     return new AutoBuilder_AwsInstanceMetadata_Builder();
@@ -36,6 +36,8 @@ public record AwsInstanceMetadata(
     Builder setEnvironment(String environment);
 
     Builder setDomain(String domain);
+
+    Builder setInstanceId(String instanceId);
 
     AwsInstanceMetadata build();
   }

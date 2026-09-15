@@ -38,7 +38,6 @@ java_library(
         "PolicyProvider.java",
         "TimeProvider.java",
         "TransparentCaService.java",
-        "TrustDomain.java",
         "TrustDomainExtractor.java",
     ],
     plugins = [":auto_value_plugin"],
@@ -57,6 +56,6 @@ java_library(
         "@maven//:jakarta_inject_jakarta_inject_api",
         "@maven//:org_bouncycastle_bcpkix_jdk18on",
         "@maven//:org_bouncycastle_bcprov_jdk18on",
-        "@pcit_mbs//java/com/google/mbs:certmanagement",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )

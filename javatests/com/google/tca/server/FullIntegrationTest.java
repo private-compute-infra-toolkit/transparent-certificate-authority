@@ -24,12 +24,11 @@ import static org.mockito.Mockito.when;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Key;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
-import com.google.mbs.MeasurementBoundCertificate;
-import com.google.mbs.attestationcollection.AttestationToken;
-import com.google.mbs.qualifier.MbsRoot;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.google.tca.adapters.PolicyBucket;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
@@ -154,8 +153,6 @@ public class FullIntegrationTest {
   }
 
   private void setupServerAndClient() throws CertificateException, IOException {
-    LocalArgs localArgs = new LocalArgs();
-
     if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
       Security.addProvider(new BouncyCastleProvider());
     }
@@ -203,12 +200,7 @@ public class FullIntegrationTest {
                             .annotatedWith(PolicyBucket.class)
                             .toInstance(BUCKET_NAME);
                         bind(MeasurementBoundCertificate.class).toInstance(mbs);
-                        bind(X509Certificate.class)
-                            .annotatedWith(MbsRoot.class)
-                            .toInstance(mbs.getCertificate());
-                        bind(java.security.PrivateKey.class)
-                            .annotatedWith(MbsRoot.class)
-                            .toInstance(mbs.getPrivateKey());
+                        bind(MeasurementBoundCertificateProvider.class).toInstance(() -> mbs);
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
                             .annotatedWith(JwtAuth.class)
@@ -220,6 +212,7 @@ public class FullIntegrationTest {
                                     .setAccountId("dummy_account")
                                     .setEnvironment("local")
                                     .setDomain("pcit.goog")
+                                    .setInstanceId("local-instance")
                                     .build());
                       }
                     }));
@@ -231,7 +224,12 @@ public class FullIntegrationTest {
     JwtInterceptor jwtInterceptor = injector.getInstance(JwtInterceptor.class);
     PrometheusMeterRegistry meterRegistry = injector.getInstance(PrometheusMeterRegistry.class);
 
-    tcaServer = new TcaServer(ANY_PORT, service, legacyService, jwtInterceptor, meterRegistry);
+    MeasurementBoundCertificateProvider certProvider =
+        injector.getInstance(MeasurementBoundCertificateProvider.class);
+
+    tcaServer =
+        new TcaServer(
+            ANY_PORT, service, legacyService, jwtInterceptor, meterRegistry, certProvider);
     tcaServer.start().join();
 
     httpClient = WebClient.of("http://127.0.0.1:" + tcaServer.port());
@@ -331,7 +329,11 @@ public class FullIntegrationTest {
             cf.generateCertificate(
                 new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
 
-    X509Certificate rootCert = injector.getInstance(Key.get(X509Certificate.class, MbsRoot.class));
+    X509Certificate rootCert =
+        injector
+            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getCertificate()
+            .getCertificate();
 
     X509Certificate responseRootCert =
         (X509Certificate)

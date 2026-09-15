@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.flogger.FluentLogger;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.linecorp.armeria.common.AggregatedHttpRequest;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpResponse;
@@ -37,6 +38,7 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -49,14 +51,18 @@ public class TcaServer {
   private final Server server;
   private final HealthManager healthManager;
   private final int port;
+  private final MeasurementBoundCertificateProvider certificateProvider;
 
   public TcaServer(
       int port,
       TransparentCertificateAuthorityGrpcHandler service,
       TrustedCertificateAuthorityGrpcHandler legacyService,
       JwtInterceptor jwtInterceptor,
-      PrometheusMeterRegistry meterRegistry) {
+      PrometheusMeterRegistry meterRegistry,
+      MeasurementBoundCertificateProvider certificateProvider) {
     this.port = port;
+    this.certificateProvider =
+        Objects.requireNonNull(certificateProvider, "certificateProvider cannot be null");
     this.healthManager = new HealthManager();
 
     final GrpcService grpcService =
@@ -82,7 +88,7 @@ public class TcaServer {
             .service(
                 "/healthz",
                 (ctx, req) -> {
-                  if (healthManager.isServing()) {
+                  if (isHealthy()) {
                     return HttpResponse.of(HttpStatus.OK);
                   }
                   return HttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
@@ -242,6 +248,24 @@ public class TcaServer {
 
   public Server getServer() {
     return server;
+  }
+
+  // In MBS 0.9.0, getCertificate() is decoupled from reloads and throws IllegalStateException
+  // if invoked prior to initial root certificate loading. Healthcheck validates both active
+  // server lifecycle and presence of valid cryptographic material.
+  boolean isHealthy() {
+    if (!healthManager.isServing()) {
+      return false;
+    }
+    try {
+      return certificateProvider.getCertificate() != null;
+    } catch (IllegalStateException e) {
+      logger.atFine().log("Healthcheck failed: certificate is not available yet.");
+      return false;
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log("Healthcheck failed with unexpected exception");
+      return false;
+    }
   }
 
   public static class HealthManager {

@@ -27,6 +27,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.io.BaseEncoding;
+import com.google.mbs.domain.MeasurementBoundCertificate;
+import com.google.mbs.domain.MeasurementBoundCertificateProvider;
 import com.google.protobuf.ByteString;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
@@ -56,6 +58,7 @@ import java.util.Optional;
 import java.util.Set;
 import javax.security.auth.x500.X500Principal;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -106,10 +109,15 @@ public class TransparentCaServiceTest {
                     subOpStartNano = now;
                   }
                 });
+    when(mockRootCertificate.getSubjectAlternativeNames())
+        .thenReturn(
+            List.of(
+                List.of(GeneralName.uniformResourceIdentifier, "spiffe://tca.pcit.goog/workload")));
+    MeasurementBoundCertificateProvider certificateProvider =
+        () -> new MeasurementBoundCertificate(mockRootCertificate, mockPrivateKey, null);
     transparentCaService =
         new TransparentCaService(
-            mockRootCertificate,
-            mockPrivateKey,
+            certificateProvider,
             mockVerifierProvider,
             mockCertificateSigner,
             mockKeyDecoder,
@@ -142,21 +150,7 @@ public class TransparentCaServiceTest {
     when(mockEndorsementMetadataProvider.getValidity(any())).thenReturn(createValidity());
     when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
     when(mockTimeProvider.now()).thenReturn(testTime);
-    when(mockCertificateModifiersCreator.create(any())).thenReturn(List.of());
-
-    TransparentCaService serviceWithRealCrypto =
-        new TransparentCaService(
-            mockRootCertificate,
-            mockPrivateKey,
-            mockVerifierProvider,
-            mockCertificateSigner,
-            mockKeyDecoder,
-            mockPolicyProvider,
-            mockTimeProvider,
-            mockEndorsementMetadataProvider,
-            mockCertificateModifiersCreator,
-            mockAudienceBindingValidator,
-            mockMetrics);
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
 
     when(mockCertificateSigner.signCsr(
             aryEq(csrBytes),
@@ -169,7 +163,7 @@ public class TransparentCaServiceTest {
         .thenReturn(mockChildCertificate);
 
     List<X509Certificate> signedCerts =
-        serviceWithRealCrypto.issueCertificate(
+        transparentCaService.issueCertificate(
             request, createIdentityWithBinding(keyPair.getPublic()));
     assertEquals(2, signedCerts.size());
     assertEquals(signedCerts.get(0), mockChildCertificate);
@@ -214,7 +208,7 @@ public class TransparentCaServiceTest {
     when(mockEndorsementMetadataProvider.getValidity(any())).thenReturn(createValidity());
     when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
     when(mockTimeProvider.now()).thenReturn(testTime);
-    when(mockCertificateModifiersCreator.create(any())).thenReturn(List.of());
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
 
     when(mockCertificateSigner.signCsr(
             aryEq(csrBytes),
@@ -256,7 +250,7 @@ public class TransparentCaServiceTest {
     when(mockEndorsementMetadataProvider.getValidity(any())).thenReturn(createValidity());
     when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
     when(mockTimeProvider.now()).thenReturn(testTime);
-    when(mockCertificateModifiersCreator.create(any())).thenReturn(List.of());
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
 
     when(mockCertificateSigner.signCsr(
             aryEq(csrBytes),
@@ -443,7 +437,7 @@ public class TransparentCaServiceTest {
     when(mockKeyDecoder.decodeRawPublicKey(any())).thenReturn(keyPair.getPublic());
     doThrow(new AudienceValidationException("audience mismatch"))
         .when(mockAudienceBindingValidator)
-        .validate(any(), any());
+        .validate(any(), any(), any());
 
     assertThrows(
         AudienceValidationException.class,
@@ -474,7 +468,7 @@ public class TransparentCaServiceTest {
     when(mockEndorsementMetadataProvider.getValidity(any())).thenReturn(createValidity());
     when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
     when(mockTimeProvider.now()).thenReturn(testTime);
-    when(mockCertificateModifiersCreator.create(any())).thenReturn(List.of());
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
 
     when(mockCertificateSigner.signCsr(any(), any(), any(), any(), any(), any(), any()))
         .thenThrow(new java.security.cert.CertificateException("signing failed"));
@@ -486,5 +480,125 @@ public class TransparentCaServiceTest {
                 request, createIdentityWithBinding(keyPair.getPublic())));
 
     verify(mockMetrics).incrementProcessingCounter(ProcessingStatus.SIGNING_ERROR);
+  }
+
+  @Test
+  public void issueCertificate_invalidRootSan_throwsCertificateExceptionAndIncrementsMetric()
+      throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    PKCS10CertificationRequest csr = createTestCsr(keyPair);
+    CertificateIssuanceRequest request = createValidRequest(csr.getEncoded());
+
+    // Root certificate without any valid SPIFFE ID SAN triggers IllegalArgumentException in
+    // extractor
+    when(mockRootCertificate.getSubjectAlternativeNames()).thenReturn(null);
+
+    assertThrows(
+        java.security.cert.CertificateException.class,
+        () ->
+            transparentCaService.issueCertificate(
+                request, createIdentityWithBinding(keyPair.getPublic())));
+
+    verify(mockMetrics).incrementProcessingCounter(ProcessingStatus.SIGNING_ERROR);
+  }
+
+  @Test
+  public void issueCertificate_dynamicRootRotation_usesUpdatedRootAndKeyAndTrustDomain()
+      throws Exception {
+    KeyPair keyPair1 = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    PKCS10CertificationRequest csr1 = createTestCsr(keyPair1);
+    byte[] csrBytes1 = csr1.getEncoded();
+    CertificateIssuanceRequest request1 = createValidRequest(csrBytes1);
+
+    KeyPair keyPair2 = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    PKCS10CertificationRequest csr2 = createTestCsr(keyPair2);
+    byte[] csrBytes2 = csr2.getEncoded();
+    CertificateIssuanceRequest request2 = createValidRequest(csrBytes2);
+
+    X509Certificate mockRootCertificate2 = org.mockito.Mockito.mock(X509Certificate.class);
+    X509Certificate mockChildCertificate2 = org.mockito.Mockito.mock(X509Certificate.class);
+    PrivateKey mockPrivateKey2 = org.mockito.Mockito.mock(PrivateKey.class);
+
+    when(mockRootCertificate2.getSubjectAlternativeNames())
+        .thenReturn(
+            List.of(
+                List.of(
+                    GeneralName.uniformResourceIdentifier, "spiffe://tca.rotated.goog/workload")));
+
+    MeasurementBoundCertificate mbc1 =
+        new MeasurementBoundCertificate(mockRootCertificate, mockPrivateKey, null);
+    MeasurementBoundCertificate mbc2 =
+        new MeasurementBoundCertificate(mockRootCertificate2, mockPrivateKey2, null);
+    java.util.concurrent.atomic.AtomicReference<MeasurementBoundCertificate> currentCertRef =
+        new java.util.concurrent.atomic.AtomicReference<>(mbc1);
+
+    TransparentCaService dynamicService =
+        new TransparentCaService(
+            currentCertRef::get,
+            mockVerifierProvider,
+            mockCertificateSigner,
+            mockKeyDecoder,
+            mockPolicyProvider,
+            mockTimeProvider,
+            mockEndorsementMetadataProvider,
+            mockCertificateModifiersCreator,
+            mockAudienceBindingValidator,
+            mockMetrics);
+
+    when(mockVerifierProvider.getVerifier(any(AttestationEvidence.class)))
+        .thenReturn(Optional.of(mockAttestationVerifier));
+    when(mockAttestationVerifier.verify(
+            any(AttestationEvidence.class), any(PublicKey.class), any(ReferenceValues.class)))
+        .thenReturn(true);
+    when(mockKeyDecoder.decodeRawPublicKey(any()))
+        .thenReturn(keyPair1.getPublic(), keyPair2.getPublic());
+    when(mockPolicyProvider.getPolicy(any(), any(), any()))
+        .thenReturn(Optional.of(createValidPolicy()));
+    when(mockEndorsementMetadataProvider.getAnnotations(any()))
+        .thenReturn(createValidEndorsementProperties());
+    when(mockEndorsementMetadataProvider.getValidity(any())).thenReturn(createValidity());
+    when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
+    when(mockTimeProvider.now()).thenReturn(testTime);
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
+
+    when(mockCertificateSigner.signCsr(
+            aryEq(csrBytes1),
+            eq(mockRootCertificate),
+            eq(mockPrivateKey),
+            any(),
+            any(),
+            any(),
+            any()))
+        .thenReturn(mockChildCertificate);
+    when(mockCertificateSigner.signCsr(
+            aryEq(csrBytes2),
+            eq(mockRootCertificate2),
+            eq(mockPrivateKey2),
+            any(),
+            any(),
+            any(),
+            any()))
+        .thenReturn(mockChildCertificate2);
+
+    // 1. First issuance uses initial root, key, and trust domain
+    List<X509Certificate> certs1 =
+        dynamicService.issueCertificate(request1, createIdentityWithBinding(keyPair1.getPublic()));
+    assertEquals(List.of(mockChildCertificate, mockRootCertificate), certs1);
+    verify(mockAudienceBindingValidator)
+        .validate(
+            keyPair1.getPublic(), createIdentityWithBinding(keyPair1.getPublic()), "tca.pcit.goog");
+
+    // 2. Rotate root certificate dynamically
+    currentCertRef.set(mbc2);
+
+    // 3. Second issuance uses rotated root, key, and trust domain
+    List<X509Certificate> certs2 =
+        dynamicService.issueCertificate(request2, createIdentityWithBinding(keyPair2.getPublic()));
+    assertEquals(List.of(mockChildCertificate2, mockRootCertificate2), certs2);
+    verify(mockAudienceBindingValidator)
+        .validate(
+            keyPair2.getPublic(),
+            createIdentityWithBinding(keyPair2.getPublic()),
+            "tca.rotated.goog");
   }
 }

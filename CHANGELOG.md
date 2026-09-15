@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.10.0 (2026-09-15)
+
+
+### Features
+
+* Adapt TCA to new MBS certificate reloader and domain ports
+* Integrate MBS 0.9.0 and validate root certificate in healthcheck
+
 ## 0.9.0 (2026-09-07)
 
 

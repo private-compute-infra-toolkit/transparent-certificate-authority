@@ -40,58 +40,49 @@ public final class OidcAudienceBindingValidatorTest {
           .setAccountId("dummy_account")
           .setEnvironment("test")
           .setDomain("aws.pcit.local")
+          .setInstanceId("i-testinstance")
           .build();
 
   private KeyPair keyPair;
+  private OidcAudienceBindingValidator validator;
 
   @Before
   public void setUp() throws Exception {
     keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    validator = new OidcAudienceBindingValidator(METADATA);
   }
 
   @Test
   public void validate_trustDomainAudience_succeeds() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience = "https://tca.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
     CallerIdentity callerIdentity = new CallerIdentity("issuer", "subject", Set.of(audience));
 
-    validator.validate(keyPair.getPublic(), callerIdentity);
+    validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN);
   }
 
   @Test
   public void validate_globalHostnameAudience_succeeds() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://tca.test.aws.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
     CallerIdentity callerIdentity = new CallerIdentity("issuer", "subject", Set.of(audience));
 
-    validator.validate(keyPair.getPublic(), callerIdentity);
+    validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN);
   }
 
   @Test
   public void validate_regionalHostnameAudience_succeeds() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://us-east-1.tca.test.aws.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
     CallerIdentity callerIdentity = new CallerIdentity("issuer", "subject", Set.of(audience));
 
-    validator.validate(keyPair.getPublic(), callerIdentity);
+    validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN);
   }
 
   @Test
   public void validate_mismatchedRegionalAudience_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://us-west-1.tca.test.aws.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -99,14 +90,11 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_globalHostnameAudienceWrongDomain_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://tca.test.aws.pcit.local1/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -114,14 +102,11 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_globalHostnameAudienceWrongEnv_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://tca.test1.aws.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -129,14 +114,11 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_regionalHostnameAudienceWrongDomain_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://us-east-1.tca.test.aws.pcit.local1/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -144,14 +126,11 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_regionalHostnameAudienceWrongEnv_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://us-east-1.tca.test1.aws.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -159,28 +138,22 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_trustDomainSubdomain_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience = "https://sub.tca.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
     CallerIdentity callerIdentity = new CallerIdentity("issuer", "subject", Set.of(audience));
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_globalHostnameSubdomain_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://sub.tca.test.aws.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -188,14 +161,11 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_regionalHostnameSubdomain_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://sub.us-east-1.tca.test.aws.pcit.local/v1/certificates:issue?pubkey_sha256="
@@ -204,28 +174,22 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_trustDomainTopLevel_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience = "https://tca.pcit.local.top/v1/certificates:issue?pubkey_sha256=" + digest;
     CallerIdentity callerIdentity = new CallerIdentity("issuer", "subject", Set.of(audience));
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_globalHostnameTopLevel_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://tca.test.aws.pcit.local.top/v1/certificates:issue?pubkey_sha256=" + digest;
@@ -233,14 +197,11 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_regionalHostnameTopLevel_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String audience =
         "https://us-east-1.tca.test.aws.pcit.local.top/v1/certificates:issue?pubkey_sha256="
@@ -249,40 +210,31 @@ public final class OidcAudienceBindingValidatorTest {
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_mismatchedBinding_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String audience = "https://tca.pcit.local/v1/certificates:issue?pubkey_sha256=wrong-digest";
     CallerIdentity callerIdentity = new CallerIdentity("issuer", "subject", Set.of(audience));
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_missingBinding_fails() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     CallerIdentity callerIdentity =
         new CallerIdentity("issuer", "subject", Set.of("other-audience"));
 
     assertThrows(
         AudienceValidationException.class,
-        () -> validator.validate(keyPair.getPublic(), callerIdentity));
+        () -> validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN));
   }
 
   @Test
   public void validate_multipleAudiences_oneValid_succeeds() throws Exception {
-    OidcAudienceBindingValidator validator =
-        new OidcAudienceBindingValidator(TRUST_DOMAIN, METADATA);
-
     String digest = computeDigest(keyPair.getPublic().getEncoded());
     String validAudience = "https://tca.pcit.local/v1/certificates:issue?pubkey_sha256=" + digest;
     String invalidAudience =
@@ -290,7 +242,7 @@ public final class OidcAudienceBindingValidatorTest {
     CallerIdentity callerIdentity =
         new CallerIdentity("issuer", "subject", Set.of(invalidAudience, validAudience));
 
-    validator.validate(keyPair.getPublic(), callerIdentity);
+    validator.validate(keyPair.getPublic(), callerIdentity, TRUST_DOMAIN);
   }
 
   private String computeDigest(byte[] data) throws Exception {
