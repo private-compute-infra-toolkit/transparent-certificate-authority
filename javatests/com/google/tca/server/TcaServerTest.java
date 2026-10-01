@@ -22,12 +22,14 @@ import static org.mockito.Mockito.when;
 
 import com.google.mbs.domain.MeasurementBoundCertificate;
 import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackage;
 import com.linecorp.armeria.client.WebClient;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import io.grpc.ServerServiceDefinition;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -69,7 +71,8 @@ public class TcaServerTest {
 
   @Test
   public void healthCheck_returnsOkWhenServingAndCertificateAvailable() {
-    when(certificateProvider.getCertificate()).thenReturn(mockCertificate);
+    when(certificateProvider.getActiveTrustPackage())
+        .thenReturn(new TrustPackage(List.of(mockCertificate), List.of()));
 
     tcaServer =
         new TcaServer(
@@ -85,7 +88,7 @@ public class TcaServerTest {
 
   @Test
   public void healthCheck_returnsServiceUnavailableWhenCertificateThrowsIllegalStateException() {
-    when(certificateProvider.getCertificate())
+    when(certificateProvider.getActiveTrustPackage())
         .thenThrow(
             new IllegalStateException(
                 "Measurement-bound certificate has not been initialized yet"));
@@ -104,7 +107,8 @@ public class TcaServerTest {
 
   @Test
   public void healthCheck_returnsServiceUnavailableWhenServerStopped() {
-    when(certificateProvider.getCertificate()).thenReturn(mockCertificate);
+    when(certificateProvider.getActiveTrustPackage())
+        .thenReturn(new TrustPackage(List.of(mockCertificate), List.of()));
 
     tcaServer =
         new TcaServer(

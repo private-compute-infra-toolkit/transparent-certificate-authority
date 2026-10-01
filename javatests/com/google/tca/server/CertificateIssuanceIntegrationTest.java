@@ -31,6 +31,7 @@ import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.MeasurementBoundCertificate;
 import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackage;
 import com.google.oak.attestation.v1.Endorsements;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
@@ -64,6 +65,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
@@ -184,7 +186,10 @@ public class CertificateIssuanceIntegrationTest {
                         bind(MeasurementBoundCertificate.class)
                             .toInstance(measurementBoundCertificate);
                         bind(MeasurementBoundCertificateProvider.class)
-                            .toInstance(() -> measurementBoundCertificate);
+                            .toInstance(
+                                () ->
+                                    new TrustPackage(
+                                        List.of(measurementBoundCertificate), List.of()));
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
                             .annotatedWith(JwtAuth.class)
@@ -457,7 +462,9 @@ public class CertificateIssuanceIntegrationTest {
     X509Certificate rootCert =
         injector
             .getInstance(MeasurementBoundCertificateProvider.class)
-            .getCertificate()
+            .getActiveTrustPackage()
+            .bundles()
+            .get(0)
             .getCertificate();
 
     X509Certificate responseRootCert =
@@ -566,7 +573,9 @@ public class CertificateIssuanceIntegrationTest {
     X509Certificate rootCert =
         injector
             .getInstance(MeasurementBoundCertificateProvider.class)
-            .getCertificate()
+            .getActiveTrustPackage()
+            .bundles()
+            .get(0)
             .getCertificate();
 
     X509Certificate responseRootCert =

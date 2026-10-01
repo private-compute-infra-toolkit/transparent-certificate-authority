@@ -33,6 +33,7 @@ import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.MeasurementBoundCertificate;
 import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackage;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
 import com.google.tca.adapters.OakAttestationEvidence;
@@ -148,7 +149,8 @@ public class CertificateIssuanceComponentTest {
                       protected void configure() {
                         bind(FileFetcher.class).toInstance(fileFetcher);
                         bind(TimeProvider.class).toInstance(mockTimeProvider);
-                        bind(MeasurementBoundCertificateProvider.class).toInstance(() -> cert);
+                        bind(MeasurementBoundCertificateProvider.class)
+                            .toInstance(() -> new TrustPackage(List.of(cert), List.of()));
                         bind(AwsInstanceMetadata.class)
                             .toInstance(
                                 AwsInstanceMetadata.builder()
@@ -172,7 +174,9 @@ public class CertificateIssuanceComponentTest {
     rootCertificate =
         injector
             .getInstance(MeasurementBoundCertificateProvider.class)
-            .getCertificate()
+            .getActiveTrustPackage()
+            .bundles()
+            .get(0)
             .getCertificate();
   }
 

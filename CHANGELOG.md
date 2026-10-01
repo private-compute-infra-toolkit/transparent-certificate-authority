@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.11.0 (2026-10-01)
+
+
+### Features
+
+* Update submodule MBS to 0.10.0
+
 ## 0.10.0 (2026-09-15)
 
 

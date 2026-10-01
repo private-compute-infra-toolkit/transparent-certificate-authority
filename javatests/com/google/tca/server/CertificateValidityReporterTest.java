@@ -22,12 +22,14 @@ import static org.mockito.Mockito.when;
 
 import com.google.mbs.domain.MeasurementBoundCertificate;
 import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackage;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,7 +54,9 @@ public class CertificateValidityReporterTest {
   @Before
   public void setUp() {
     MeasurementBoundCertificateProvider certificateProvider =
-        () -> new MeasurementBoundCertificate(mockCertificate, null, null);
+        () ->
+            new TrustPackage(
+                List.of(new MeasurementBoundCertificate(mockCertificate, null, null)), List.of());
     reporter = new CertificateValidityReporter(certificateProvider, mockMetrics, mockTimeProvider);
   }
 

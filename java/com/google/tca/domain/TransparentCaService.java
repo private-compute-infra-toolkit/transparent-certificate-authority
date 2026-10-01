@@ -113,7 +113,7 @@ public class TransparentCaService {
       timer.recordSubOperationAndResetTimer(EXTRACT_PUBLIC_KEY);
     }
 
-    MeasurementBoundCertificate mbc = certificateProvider.getCertificate();
+    MeasurementBoundCertificate mbc = certificateProvider.getActiveTrustPackage().bundles().get(0);
     X509Certificate rootCertificate = mbc.getCertificate();
     PrivateKey privateKey = mbc.getPrivateKey();
     String trustDomain;

@@ -29,6 +29,7 @@ import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.MeasurementBoundCertificate;
 import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackage;
 import com.google.tca.adapters.PolicyBucket;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
@@ -58,6 +59,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
@@ -200,7 +202,8 @@ public class FullIntegrationTest {
                             .annotatedWith(PolicyBucket.class)
                             .toInstance(BUCKET_NAME);
                         bind(MeasurementBoundCertificate.class).toInstance(mbs);
-                        bind(MeasurementBoundCertificateProvider.class).toInstance(() -> mbs);
+                        bind(MeasurementBoundCertificateProvider.class)
+                            .toInstance(() -> new TrustPackage(List.of(mbs), List.of()));
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
                             .annotatedWith(JwtAuth.class)
@@ -332,7 +335,9 @@ public class FullIntegrationTest {
     X509Certificate rootCert =
         injector
             .getInstance(MeasurementBoundCertificateProvider.class)
-            .getCertificate()
+            .getActiveTrustPackage()
+            .bundles()
+            .get(0)
             .getCertificate();
 
     X509Certificate responseRootCert =

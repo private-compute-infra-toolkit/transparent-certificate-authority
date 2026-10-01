@@ -250,7 +250,7 @@ public class TcaServer {
     return server;
   }
 
-  // In MBS 0.9.0, getCertificate() is decoupled from reloads and throws IllegalStateException
+  // In MBS, getActiveTrustPackage() is decoupled from reloads and throws IllegalStateException
   // if invoked prior to initial root certificate loading. Healthcheck validates both active
   // server lifecycle and presence of valid cryptographic material.
   boolean isHealthy() {
@@ -258,7 +258,7 @@ public class TcaServer {
       return false;
     }
     try {
-      return certificateProvider.getCertificate() != null;
+      return !certificateProvider.getActiveTrustPackage().bundles().isEmpty();
     } catch (IllegalStateException e) {
       logger.atFine().log("Healthcheck failed: certificate is not available yet.");
       return false;

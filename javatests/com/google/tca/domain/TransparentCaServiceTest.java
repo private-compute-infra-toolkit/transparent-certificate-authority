@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.io.BaseEncoding;
 import com.google.mbs.domain.MeasurementBoundCertificate;
 import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackage;
 import com.google.protobuf.ByteString;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
@@ -114,7 +115,10 @@ public class TransparentCaServiceTest {
             List.of(
                 List.of(GeneralName.uniformResourceIdentifier, "spiffe://tca.pcit.goog/workload")));
     MeasurementBoundCertificateProvider certificateProvider =
-        () -> new MeasurementBoundCertificate(mockRootCertificate, mockPrivateKey, null);
+        () ->
+            new TrustPackage(
+                List.of(new MeasurementBoundCertificate(mockRootCertificate, mockPrivateKey, null)),
+                List.of());
     transparentCaService =
         new TransparentCaService(
             certificateProvider,
@@ -534,7 +538,7 @@ public class TransparentCaServiceTest {
 
     TransparentCaService dynamicService =
         new TransparentCaService(
-            currentCertRef::get,
+            () -> new TrustPackage(List.of(currentCertRef.get()), List.of()),
             mockVerifierProvider,
             mockCertificateSigner,
             mockKeyDecoder,
