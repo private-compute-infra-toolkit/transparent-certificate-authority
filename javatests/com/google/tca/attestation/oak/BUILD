@@ -56,3 +56,27 @@ java_test(
         "@oak//proto/attestation:verification_java_proto",
     ],
 )
+
+java_test(
+    name = "OakPesEndorsementVerifierTest",
+    size = "small",
+    srcs = ["OakPesEndorsementVerifierTest.java"],
+    data = [
+        "//javatests/com/google/tca/attestation/oak/testdata:pes_endorsement_reference_values.textproto",
+        "//javatests/com/google/tca/server:attestation_test_resources",
+    ],
+    deps = [
+        "//java/com/google/tca/adapters",
+        "//java/com/google/tca/attestation/oak",
+        "//java/com/google/tca/proto:transparent_certificate_authority_java_proto",
+        "@maven//:com_google_code_gson_gson",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@oak//proto:variant_java_proto",
+        "@oak//proto/attestation:endorsement_java_proto",
+        "@oak//proto/attestation:evidence_java_proto",
+        "@oak//proto/attestation:reference_value_java_proto",
+        "@oak//proto/attestation:verification_java_proto",
+    ],
+)

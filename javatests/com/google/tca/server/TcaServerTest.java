@@ -118,4 +118,15 @@ public class TcaServerTest {
 
     assertThat(tcaServer.isHealthy()).isFalse();
   }
+
+  @Test
+  public void server_configuresIdleTimeoutGreaterThanAlbIdleTimeout() {
+    tcaServer =
+        new TcaServer(
+            0, service, legacyService, jwtInterceptor, meterRegistry, certificateProvider);
+
+    // Verify Armeria idle timeout is configured to 65 seconds (65000 ms) to exceed ALB's 60s idle
+    // timeout.
+    assertThat(tcaServer.getServer().config().idleTimeoutMillis()).isEqualTo(65000L);
+  }
 }

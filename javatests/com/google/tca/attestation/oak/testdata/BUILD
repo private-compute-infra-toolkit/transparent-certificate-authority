@@ -36,3 +36,5 @@ filegroup(
         "manual_oak_reference_values_regex_mismatch.textproto",
     ],
 )
+
+exports_files(["pes_endorsement_reference_values.textproto"])

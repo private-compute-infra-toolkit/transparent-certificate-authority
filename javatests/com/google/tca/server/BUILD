@@ -15,15 +15,26 @@
 load("@rules_java//java:defs.bzl", "java_library", "java_test")
 
 filegroup(
-    name = "test_resources",
+    name = "attestation_test_resources",
     srcs = [
         "testdata/golden_request.textproto",
+    ],
+    visibility = [
+        "//javatests/com/google/tca/attestation/oak:__subpackages__",
+        "//javatests/com/google/tca/server:__subpackages__",
+    ],
+)
+
+filegroup(
+    name = "test_resources",
+    srcs = [
         "testdata/policy/v2/policy.textproto",
         "testdata/reference_values.textproto",
         "testdata/test_tca_config.json",
         "testdata/test_tca_config.json.sigstore.json",
         "testdata/test_tca_config_modified.json",
         "testdata/trusted_root.json",
+        ":attestation_test_resources",
     ],
     visibility = [
         "//javatests/com/google/tca/server:__subpackages__",

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.12.0 (2026-10-08)
+
+
+### Features
+
+* bump Oak for multi-signature PublicEndorsement support
+
+
+### Bug Fixes
+
+* (server) set Armeria idle timeout to 65s to prevent ALB 502s
+
 ## 0.11.0 (2026-10-01)
 
 
