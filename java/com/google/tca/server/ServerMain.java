@@ -22,7 +22,7 @@ import com.google.common.flogger.FluentLogger;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.mbs.domain.CertificateMonitor;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackageProvider;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
 /** An Armeria server that hosts the TransparentCaService with gRPC and REST support. */
@@ -62,12 +62,12 @@ public class ServerMain {
     CertificateMonitor certMonitor = injector.getInstance(CertificateMonitor.class);
     certMonitor.start();
 
-    MeasurementBoundCertificateProvider certProvider =
-        injector.getInstance(MeasurementBoundCertificateProvider.class);
+    TrustPackageProvider trustPackageProvider = injector.getInstance(TrustPackageProvider.class);
 
     int port = 50051;
     TcaServer tcaServer =
-        new TcaServer(port, service, legacyService, jwtInterceptor, meterRegistry, certProvider);
+        new TcaServer(
+            port, service, legacyService, jwtInterceptor, meterRegistry, trustPackageProvider);
 
     tcaServer.start().join();
 

@@ -27,9 +27,11 @@ import com.google.inject.Injector;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedCertificate;
 import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
+import com.google.mbs.domain.ValidityPeriod;
 import com.google.tca.adapters.PolicyBucket;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
@@ -159,23 +161,23 @@ public class FullIntegrationTest {
       Security.addProvider(new BouncyCastleProvider());
     }
 
-    // Create the MeasurementBoundCertificate instance to be used as a singleton in the test
+    Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
     MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
                 new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
                 new X500Name("CN=Standalone CA"),
-                Duration.ofDays(30),
                 Optional.of(
                     new GeneralNames(
                         new GeneralName(
                             GeneralName.uniformResourceIdentifier, "spiffe://tca.local.test"))),
                 KeyUsage.keyCertSign)
-            .generate();
+            .generate(
+                new SelfSignedCertificate(
+                    1, new ValidityPeriod(certStart, certStart.plus(Duration.ofDays(30)))));
 
     AttestationToken dummyToken = AttestationToken.fromBytes(new byte[0]);
-    final MeasurementBoundCertificate mbs =
-        new MeasurementBoundCertificate(
-            certAndKey.certificate(), certAndKey.privateKey(), dummyToken);
+    final SelfSignedBundle mbs =
+        new SelfSignedBundle(certAndKey.certificate(), certAndKey.privateKey(), dummyToken);
 
     java.security.KeyPair jwtKeyPair;
     try {
@@ -201,8 +203,7 @@ public class FullIntegrationTest {
                         bind(String.class)
                             .annotatedWith(PolicyBucket.class)
                             .toInstance(BUCKET_NAME);
-                        bind(MeasurementBoundCertificate.class).toInstance(mbs);
-                        bind(MeasurementBoundCertificateProvider.class)
+                        bind(TrustPackageProvider.class)
                             .toInstance(() -> new TrustPackage(List.of(mbs), List.of()));
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
@@ -227,8 +228,7 @@ public class FullIntegrationTest {
     JwtInterceptor jwtInterceptor = injector.getInstance(JwtInterceptor.class);
     PrometheusMeterRegistry meterRegistry = injector.getInstance(PrometheusMeterRegistry.class);
 
-    MeasurementBoundCertificateProvider certProvider =
-        injector.getInstance(MeasurementBoundCertificateProvider.class);
+    TrustPackageProvider certProvider = injector.getInstance(TrustPackageProvider.class);
 
     tcaServer =
         new TcaServer(
@@ -334,11 +334,11 @@ public class FullIntegrationTest {
 
     X509Certificate rootCert =
         injector
-            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getInstance(TrustPackageProvider.class)
             .getActiveTrustPackage()
-            .bundles()
+            .selfSignedBundles()
             .get(0)
-            .getCertificate();
+            .certificate();
 
     X509Certificate responseRootCert =
         (X509Certificate)

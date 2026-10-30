@@ -31,9 +31,11 @@ import com.google.inject.Provides;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedCertificate;
 import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
+import com.google.mbs.domain.ValidityPeriod;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
 import com.google.tca.adapters.OakAttestationEvidence;
@@ -122,20 +124,22 @@ public class CertificateIssuanceComponentTest {
                         readTestFile(
                             "javatests/com/google/tca/server/testdata/reference_values.textproto"))));
 
+    Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
     MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
                 new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
                 new X500Name("CN=TCA Local"),
-                Duration.ofDays(180),
                 Optional.of(
                     new GeneralNames(
                         new GeneralName(
                             GeneralName.uniformResourceIdentifier, "spiffe://tca.local.test"))),
                 KeyUsage.keyCertSign)
-            .generate();
+            .generate(
+                new SelfSignedCertificate(
+                    1, new ValidityPeriod(certStart, certStart.plus(Duration.ofDays(180)))));
 
-    MeasurementBoundCertificate cert =
-        new MeasurementBoundCertificate(
+    SelfSignedBundle cert =
+        new SelfSignedBundle(
             certAndKey.certificate(),
             certAndKey.privateKey(),
             AttestationToken.fromBytes("DummyToken".getBytes()));
@@ -149,7 +153,7 @@ public class CertificateIssuanceComponentTest {
                       protected void configure() {
                         bind(FileFetcher.class).toInstance(fileFetcher);
                         bind(TimeProvider.class).toInstance(mockTimeProvider);
-                        bind(MeasurementBoundCertificateProvider.class)
+                        bind(TrustPackageProvider.class)
                             .toInstance(() -> new TrustPackage(List.of(cert), List.of()));
                         bind(AwsInstanceMetadata.class)
                             .toInstance(
@@ -173,11 +177,11 @@ public class CertificateIssuanceComponentTest {
     transparentCaService = injector.getInstance(TransparentCaService.class);
     rootCertificate =
         injector
-            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getInstance(TrustPackageProvider.class)
             .getActiveTrustPackage()
-            .bundles()
+            .selfSignedBundles()
             .get(0)
-            .getCertificate();
+            .certificate();
   }
 
   @Test

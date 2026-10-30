@@ -17,6 +17,7 @@
 package com.google.tca.adapters;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
@@ -38,6 +39,7 @@ import com.google.tca.domain.policy.X509Extensions;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
@@ -242,10 +244,12 @@ public class CertificateSignerImplTest {
             .getKeyIdentifier();
 
     assertThat(keyIdentifier).isEqualTo(expectedKeyIdentifier);
+    assertThat(aki.getAuthorityCertIssuer()).isNull();
+    assertThat(aki.getAuthorityCertSerialNumber()).isNull();
   }
 
   @Test
-  public void signCsr_issuerMissingSki_fallsBackToPublicKeyHash() throws Exception {
+  public void signCsr_issuerMissingSki_throwsCertificateException() throws Exception {
     KeyPair clientKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
     JcaPKCS10CertificationRequestBuilder p10Builder =
         new JcaPKCS10CertificationRequestBuilder(
@@ -267,30 +271,19 @@ public class CertificateSignerImplTest {
     X509Certificate issuerCertWithoutSki =
         new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
 
-    X509Certificate signedCert =
-        certificateSigner.signCsr(
-            csr.getEncoded(),
-            issuerCertWithoutSki,
-            issuerKeyPair.getPrivate(),
-            testTime,
-            testTime.plus(Duration.ofHours(1)),
-            List.of(),
-            new X500Principal("CN=TestCA"));
-
-    byte[] akiExtensionValue =
-        signedCert.getExtensionValue(Extension.authorityKeyIdentifier.getId());
-    assertThat(akiExtensionValue).isNotNull();
-    AuthorityKeyIdentifier aki =
-        AuthorityKeyIdentifier.getInstance(
-            ASN1OctetString.getInstance(akiExtensionValue).getOctets());
-    byte[] keyIdentifier = aki.getKeyIdentifier();
-
-    byte[] expectedKeyIdentifier =
-        new JcaX509ExtensionUtils()
-            .createAuthorityKeyIdentifier(issuerKeyPair.getPublic())
-            .getKeyIdentifier();
-
-    assertThat(keyIdentifier).isEqualTo(expectedKeyIdentifier);
+    CertificateException thrown =
+        assertThrows(
+            CertificateException.class,
+            () ->
+                certificateSigner.signCsr(
+                    csr.getEncoded(),
+                    issuerCertWithoutSki,
+                    issuerKeyPair.getPrivate(),
+                    testTime,
+                    testTime.plus(Duration.ofHours(1)),
+                    List.of(),
+                    new X500Principal("CN=TestCA")));
+    assertThat(thrown).hasMessageThat().contains("Subject Key Identifier");
   }
 
   private SubjectAlternativeNameModifier getSubjectAlternativeNameModifier() {

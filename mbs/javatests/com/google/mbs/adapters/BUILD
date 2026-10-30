@@ -17,15 +17,137 @@ load("@rules_java//java:defs.bzl", "java_test")
 package(default_visibility = ["//visibility:public"])
 
 java_test(
-    name = "S3KeyBackupStorageTest",
+    name = "PemCertificateCodecTest",
     size = "small",
-    srcs = ["S3KeyBackupStorageTest.java"],
+    srcs = ["PemCertificateCodecTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "@maven//:junit_junit",
+        "@maven//:org_bouncycastle_bcpkix_jdk18on",
+        "@maven//:org_bouncycastle_bcprov_jdk18on",
+    ],
+)
+
+java_test(
+    name = "AeadSelfSignedBundleBackupSealerTest",
+    size = "small",
+    srcs = ["AeadSelfSignedBundleBackupSealerTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_crypto_tink_tink",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
+    name = "S3BackupStorageTest",
+    size = "small",
+    srcs = ["S3BackupStorageTest.java"],
     deps = [
         "//java/com/google/mbs:certmanagement",
         "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_guava_guava",
         "@maven//:com_google_truth_truth",
         "@maven//:junit_junit",
         "@maven//:org_mockito_mockito_core",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
+    ],
+)
+
+java_test(
+    name = "S3CompleteSelfSignedBundleBackupHandleTest",
+    size = "small",
+    srcs = ["S3CompleteSelfSignedBundleBackupHandleTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
+    name = "S3CompleteCrossSignedCertificateBackupHandleTest",
+    size = "small",
+    srcs = ["S3CompleteCrossSignedCertificateBackupHandleTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
+    name = "S3EmptySelfSignedBundleBackupHandleTest",
+    size = "small",
+    srcs = ["S3EmptySelfSignedBundleBackupHandleTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
+    name = "S3EmptyCrossSignedCertificateBackupHandleTest",
+    size = "small",
+    srcs = ["S3EmptyCrossSignedCertificateBackupHandleTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
+    name = "S3BackupPathsTest",
+    size = "small",
+    srcs = ["S3BackupPathsTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+    ],
+)
+
+java_test(
+    name = "S3BackupReaderTest",
+    size = "small",
+    srcs = ["S3BackupReaderTest.java"],
+    deps = [
+        "//java/com/google/mbs:certmanagement",
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
+    ],
+)
+
+java_test(
+    name = "S3BackupWriterTest",
+    size = "small",
+    srcs = ["S3BackupWriterTest.java"],
+    deps = [
+        "//java/com/google/mbs:certmanagement",
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:software_amazon_awssdk_aws_core",
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",
     ],
@@ -65,13 +187,58 @@ java_test(
 )
 
 java_test(
-    name = "MeasurementBoundCertificateMonitorTest",
+    name = "ScheduledCertificateMonitorTest",
     size = "small",
-    srcs = ["MeasurementBoundCertificateMonitorTest.java"],
+    srcs = ["ScheduledCertificateMonitorTest.java"],
     deps = [
         "//java/com/google/mbs/adapters",
         "//java/com/google/mbs/domain",
         "@maven//:com_google_guava_guava",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
+    name = "CertificatesConfigMapperTest",
+    size = "small",
+    srcs = ["CertificatesConfigMapperTest.java"],
+    resources = [
+        "res/valid_certificates_config.textproto",
+    ],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "//proto:certificates_config_java_proto",
+        "@com_google_protobuf//:protobuf_java",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+    ],
+)
+
+java_test(
+    name = "S3CertificatesConfigProviderTest",
+    size = "small",
+    srcs = ["S3CertificatesConfigProviderTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
+        "@maven//:com_google_truth_truth",
+        "@maven//:junit_junit",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
+    ],
+)
+
+java_test(
+    name = "DefaultingCertificatesConfigProviderTest",
+    size = "small",
+    srcs = ["DefaultingCertificatesConfigProviderTest.java"],
+    deps = [
+        "//java/com/google/mbs/adapters",
+        "//java/com/google/mbs/domain",
         "@maven//:junit_junit",
         "@maven//:org_mockito_mockito_core",
     ],

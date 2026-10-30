@@ -23,6 +23,8 @@ option java_multiple_files = true;
 option java_outer_classname = "EndorsementProto";
 option java_package = "com.google.pes.v1";
 
+// Represents a publicly verifiable endorsement of an artifact statement,
+// countersigned by the Public Endorsement Service (PES).
 message PublicEndorsement {
   // Unique name of the endorsement created by the service
   // Format: endorsements/{endorsement}
@@ -62,14 +64,14 @@ message PublicEndorsement {
 // Represents in-toto statement of v1 schema. Only https://in-toto.io/Statement/v1 is supported
 message Statement {
   enum Format {
-    // Undefined and hence invalid format of the endorsement.
+    // Undefined and hence invalid format of the statement.
     FORMAT_UNSPECIFIED = 0;
 
     // JSON v1 in-toto statement.
     JSON_INTOTO = 1;
   }
 
-  // Format of a serialized endorsement
+  // Format of the serialized statement.
   Format format = 1 [(google.api.field_behavior) = REQUIRED];
 
   // Serialized statement in a given format
@@ -82,7 +84,16 @@ message Signature {
   bytes signature = 1 [(google.api.field_behavior) = REQUIRED];
 
   // The material required to verify the authenticity of the signature.
-  google.pes.v1.VerificationMaterial verification_material = 2 [(google.api.field_behavior) = REQUIRED];
+  VerificationMaterial verification_material = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // RFC 3161 timestamp token from the timestamp authority certifying the signature creation time.
+  repeated TimeStampToken time_stamp_token = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Represents an RFC 3161 TimeStampToken.
+message TimeStampToken {
+  // Contains DER-encoded TimeStampToken as defined in https://www.rfc-editor.org/info/rfc3161/#section-2.4.2
+  bytes der_bytes = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // Represents a receipt from the TLog.

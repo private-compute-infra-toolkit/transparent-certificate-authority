@@ -16,6 +16,8 @@
 
 package com.google.mbs;
 
+import com.google.mbs.domain.SelfSignedCertificate;
+import com.google.mbs.domain.ValidityPeriod;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -24,9 +26,8 @@ import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Date;
+import java.util.Objects;
 import java.util.Optional;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -46,9 +47,19 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 @FunctionalInterface
 public interface MbsCertificateFactory {
 
-  record X509CertificateAndPrivateKey(X509Certificate certificate, PrivateKey privateKey) {}
+  record X509CertificateAndPrivateKey(X509Certificate certificate, PrivateKey privateKey) {
+    public X509CertificateAndPrivateKey {
+      Objects.requireNonNull(certificate);
+      Objects.requireNonNull(privateKey);
+    }
+  }
 
-  record CertSignatureSpec(String keyAlgorithm, int keySize, String signatureAlgorithm) {}
+  record CertSignatureSpec(String keyAlgorithm, int keySize, String signatureAlgorithm) {
+    public CertSignatureSpec {
+      Objects.requireNonNull(keyAlgorithm);
+      Objects.requireNonNull(signatureAlgorithm);
+    }
+  }
 
   class MbsCertificateFactoryException extends RuntimeException {
     public MbsCertificateFactoryException(String message, Throwable cause) {
@@ -59,19 +70,22 @@ public interface MbsCertificateFactory {
   /**
    * Generates a certificate and private key.
    *
+   * @param params parameters for the self-signed certificate.
    * @return A bundle containing the certificate and private key.
    * @throws RuntimeException if generation fails.
    */
-  X509CertificateAndPrivateKey generate();
+  X509CertificateAndPrivateKey generate(SelfSignedCertificate params);
 
   /** Returns a factory for self-signed certificates with specified parameters. */
   static MbsCertificateFactory createSelfSignedCertificatesFactory(
       CertSignatureSpec certSignatureSpec,
       X500Name subjectName,
-      Duration validityDuration,
       Optional<GeneralNames> subjectAlternativeNames,
       int keyUsageMask) {
-    return () -> {
+    Objects.requireNonNull(certSignatureSpec);
+    Objects.requireNonNull(subjectName);
+    Objects.requireNonNull(subjectAlternativeNames);
+    return params -> {
       try {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance(certSignatureSpec.keyAlgorithm());
         keyGen.initialize(certSignatureSpec.keySize());
@@ -81,7 +95,7 @@ public interface MbsCertificateFactory {
             generateCertificate(
                 keyPair,
                 subjectName,
-                validityDuration,
+                params.validityPeriod(),
                 subjectAlternativeNames,
                 keyUsageMask,
                 certSignatureSpec.signatureAlgorithm());
@@ -95,26 +109,22 @@ public interface MbsCertificateFactory {
   private static X509Certificate generateCertificate(
       KeyPair keyPair,
       X500Name subjectName,
-      Duration validityDuration,
+      ValidityPeriod validityPeriod,
       Optional<GeneralNames> subjectAlternativeNames,
       int keyUsageMask,
       String sigAlg)
       throws CertificateException, CertIOException, OperatorCreationException {
-    Instant now = Instant.now();
     SecureRandom secureRandom = new SecureRandom();
     // RFC 5280 limits the serial number to 20 bytes (160 bits).
     // A positive BigInteger requires 1 bit for the sign, leaving 159 bits for entropy.
     BigInteger serial = new BigInteger(159, secureRandom);
-    // Set the start date to 24 hours in the past to avoid clock skew issues.
-    Instant notBefore = now.minus(Duration.ofDays(1));
-    Instant notAfter = now.plus(validityDuration);
 
     X509v3CertificateBuilder certBuilder =
         new JcaX509v3CertificateBuilder(
             subjectName,
             serial,
-            Date.from(notBefore),
-            Date.from(notAfter),
+            Date.from(validityPeriod.notBefore()),
+            Date.from(validityPeriod.notAfter()),
             subjectName,
             keyPair.getPublic());
 

@@ -19,16 +19,26 @@ package com.google.mbs;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Provides;
-import com.google.mbs.adapters.MeasurementBoundCertificateMonitor;
-import com.google.mbs.adapters.S3KeyBackupStorage;
+import com.google.mbs.adapters.AeadSelfSignedBundleBackupSealer;
+import com.google.mbs.adapters.DefaultingCertificatesConfigProvider;
+import com.google.mbs.adapters.PemCertificateCodec;
+import com.google.mbs.adapters.S3BackupPaths;
+import com.google.mbs.adapters.S3BackupStorage;
+import com.google.mbs.adapters.S3CertificatesConfigProvider;
+import com.google.mbs.adapters.ScheduledCertificateMonitor;
 import com.google.mbs.domain.AttestationCollector;
+import com.google.mbs.domain.BackupBucketProperties;
+import com.google.mbs.domain.BackupStorage;
+import com.google.mbs.domain.CertificateCodec;
+import com.google.mbs.domain.CertificateGenerator;
 import com.google.mbs.domain.CertificateMonitor;
-import com.google.mbs.domain.KeyBackupBucketProperties;
-import com.google.mbs.domain.KeyBackupStorage;
+import com.google.mbs.domain.CertificatesConfigBucketProperties;
+import com.google.mbs.domain.CertificatesConfigProvider;
 import com.google.mbs.domain.KmsClientInterface;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
-import com.google.mbs.domain.MeasurementBoundCertificateReloader;
 import com.google.mbs.domain.Metrics;
+import com.google.mbs.domain.SelfSignedBundleBackupSealer;
+import com.google.mbs.domain.TrustPackageProvider;
+import com.google.mbs.domain.TrustPackageReloader;
 import com.google.mbs.qualifier.AttestationUserData;
 import com.google.mbs.qualifier.InstanceId;
 import com.google.mbs.qualifier.KmsKeyArn;
@@ -37,7 +47,7 @@ import com.google.mbs.qualifier.PublicBackupBucket;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.services.s3.S3Client;
 
-/** Guice core module configuring MBS certificate provider and storage port. */
+/** Guice core module configuring MBS trust package service and storage port. */
 final class MbsCoreModule extends AbstractModule {
 
   @Override
@@ -53,21 +63,40 @@ final class MbsCoreModule extends AbstractModule {
     requireBinding(MbsCertificateFactory.class);
     requireBinding(Metrics.class);
 
-    bind(KeyBackupStorage.class).to(S3KeyBackupStorage.class).in(Singleton.class);
+    bind(BackupStorage.class).to(S3BackupStorage.class).in(Singleton.class);
+    bind(CertificateCodec.class).to(PemCertificateCodec.class);
+    bind(SelfSignedBundleBackupSealer.class).to(AeadSelfSignedBundleBackupSealer.class);
 
-    bind(KmsMeasurementBoundCertificateProvider.class).in(Singleton.class);
-    bind(MeasurementBoundCertificateProvider.class)
-        .to(KmsMeasurementBoundCertificateProvider.class);
-    bind(MeasurementBoundCertificateReloader.class)
-        .to(KmsMeasurementBoundCertificateProvider.class);
+    bind(CertificateGenerator.class).to(DefaultCertificateGenerator.class);
 
-    bind(CertificateMonitor.class).to(MeasurementBoundCertificateMonitor.class).in(Singleton.class);
+    bind(TrustPackageService.class).in(Singleton.class);
+    bind(TrustPackageProvider.class).to(TrustPackageService.class);
+    bind(TrustPackageReloader.class).to(TrustPackageService.class);
+
+    bind(CertificateMonitor.class).to(ScheduledCertificateMonitor.class).in(Singleton.class);
+  }
+
+  // TODO: bind S3CertificatesConfigProvider directly once certificates_config.textproto is
+  // deployed in all environments.
+  @Provides
+  @Singleton
+  CertificatesConfigProvider provideCertificatesConfigProvider(
+      S3CertificatesConfigProvider s3CertificatesConfigProvider) {
+    return new DefaultingCertificatesConfigProvider(s3CertificatesConfigProvider);
   }
 
   @Provides
   @Singleton
-  KeyBackupBucketProperties provideKeyBackupBucketProperties(
+  BackupBucketProperties provideBackupBucketProperties(
       @PublicBackupBucket String publicBucketName, @PrivateBackupBucket String privateBucketName) {
-    return new KeyBackupBucketPropertiesFactory(publicBucketName, privateBucketName).create();
+    return new BackupBucketPropertiesFactory(publicBucketName, privateBucketName).create();
+  }
+
+  @Provides
+  @Singleton
+  CertificatesConfigBucketProperties provideCertificatesConfigBucketProperties(
+      @PublicBackupBucket String publicBucketName) {
+    return new CertificatesConfigBucketProperties(
+        publicBucketName, S3BackupPaths.CERTIFICATES_CONFIG_FILE_PATH);
   }
 }

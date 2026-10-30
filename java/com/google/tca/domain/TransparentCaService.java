@@ -34,9 +34,11 @@ import static com.google.tca.domain.metric.ProcessingStatus.MISSING_VERIFIER;
 import static com.google.tca.domain.metric.ProcessingStatus.SIGNING_ERROR;
 import static com.google.tca.domain.metric.ProcessingStatus.SUCCESS;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.FluentLogger;
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
@@ -64,7 +66,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 public class TransparentCaService {
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
-  private final MeasurementBoundCertificateProvider certificateProvider;
+  private final TrustPackageProvider trustPackageProvider;
   private final AttestationVerifierProvider verifierProvider;
   private final CertificateSigner certificateSigner;
   private final KeyDecoder keyDecoder;
@@ -77,7 +79,7 @@ public class TransparentCaService {
 
   @Inject
   public TransparentCaService(
-      MeasurementBoundCertificateProvider certificateProvider,
+      TrustPackageProvider trustPackageProvider,
       AttestationVerifierProvider verifierProvider,
       CertificateSigner certificateSigner,
       KeyDecoder keyDecoder,
@@ -87,7 +89,7 @@ public class TransparentCaService {
       CertificateModifiersCreator certificateModifiersCreator,
       AudienceBindingValidator audienceBindingValidator,
       Metrics metrics) {
-    this.certificateProvider = certificateProvider;
+    this.trustPackageProvider = trustPackageProvider;
     this.verifierProvider = verifierProvider;
     this.certificateSigner = certificateSigner;
     this.keyDecoder = keyDecoder;
@@ -113,9 +115,10 @@ public class TransparentCaService {
       timer.recordSubOperationAndResetTimer(EXTRACT_PUBLIC_KEY);
     }
 
-    MeasurementBoundCertificate mbc = certificateProvider.getActiveTrustPackage().bundles().get(0);
-    X509Certificate rootCertificate = mbc.getCertificate();
-    PrivateKey privateKey = mbc.getPrivateKey();
+    TrustPackage trustPackage = trustPackageProvider.getActiveTrustPackage();
+    SelfSignedBundle rootBundle = trustPackage.selfSignedBundles().get(0);
+    X509Certificate rootCertificate = rootBundle.certificate();
+    PrivateKey privateKey = rootBundle.privateKey();
     String trustDomain;
     try {
       trustDomain = TrustDomainExtractor.extract(rootCertificate);
@@ -204,7 +207,11 @@ public class TransparentCaService {
 
     metrics.incrementProcessingCounter(SUCCESS);
     metrics.incrementCertificateIssuanceCounter(callerIdentity.getClientId());
-    return List.of(signedCertificate, rootCertificate);
+    return ImmutableList.<X509Certificate>builder()
+        .add(signedCertificate)
+        .addAll(trustPackage.crossSignedCertificates())
+        .add(rootCertificate)
+        .build();
   }
 
   private X500Principal createSubjectPrincipal(X500NameAttributes subject) throws IOException {

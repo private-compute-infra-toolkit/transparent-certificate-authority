@@ -27,9 +27,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.io.BaseEncoding;
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.SelfSignedBundle;
 import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
 import com.google.protobuf.ByteString;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
@@ -114,10 +115,14 @@ public class TransparentCaServiceTest {
         .thenReturn(
             List.of(
                 List.of(GeneralName.uniformResourceIdentifier, "spiffe://tca.pcit.goog/workload")));
-    MeasurementBoundCertificateProvider certificateProvider =
+    TrustPackageProvider certificateProvider =
         () ->
             new TrustPackage(
-                List.of(new MeasurementBoundCertificate(mockRootCertificate, mockPrivateKey, null)),
+                List.of(
+                    new SelfSignedBundle(
+                        mockRootCertificate,
+                        mockPrivateKey,
+                        AttestationToken.fromBytes(new byte[0]))),
                 List.of());
     transparentCaService =
         new TransparentCaService(
@@ -529,11 +534,13 @@ public class TransparentCaServiceTest {
                 List.of(
                     GeneralName.uniformResourceIdentifier, "spiffe://tca.rotated.goog/workload")));
 
-    MeasurementBoundCertificate mbc1 =
-        new MeasurementBoundCertificate(mockRootCertificate, mockPrivateKey, null);
-    MeasurementBoundCertificate mbc2 =
-        new MeasurementBoundCertificate(mockRootCertificate2, mockPrivateKey2, null);
-    java.util.concurrent.atomic.AtomicReference<MeasurementBoundCertificate> currentCertRef =
+    SelfSignedBundle mbc1 =
+        new SelfSignedBundle(
+            mockRootCertificate, mockPrivateKey, AttestationToken.fromBytes(new byte[0]));
+    SelfSignedBundle mbc2 =
+        new SelfSignedBundle(
+            mockRootCertificate2, mockPrivateKey2, AttestationToken.fromBytes(new byte[0]));
+    java.util.concurrent.atomic.AtomicReference<SelfSignedBundle> currentCertRef =
         new java.util.concurrent.atomic.AtomicReference<>(mbc1);
 
     TransparentCaService dynamicService =
@@ -604,5 +611,68 @@ public class TransparentCaServiceTest {
             keyPair2.getPublic(),
             createIdentityWithBinding(keyPair2.getPublic()),
             "tca.rotated.goog");
+  }
+
+  @Test
+  public void issueCertificate_withCrossSignedCertificates_attachesCrossCertsBetweenIssuedAndRoot()
+      throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    PKCS10CertificationRequest csr = createTestCsr(keyPair);
+    byte[] csrBytes = csr.getEncoded();
+    CertificateIssuanceRequest request = createValidRequest(csrBytes);
+
+    X509Certificate mockCrossCert1 = org.mockito.Mockito.mock(X509Certificate.class);
+    X509Certificate mockCrossCert2 = org.mockito.Mockito.mock(X509Certificate.class);
+
+    SelfSignedBundle rootBundle =
+        new SelfSignedBundle(
+            mockRootCertificate, mockPrivateKey, AttestationToken.fromBytes(new byte[0]));
+    TransparentCaService serviceWithCrossCerts =
+        new TransparentCaService(
+            () -> new TrustPackage(List.of(rootBundle), List.of(mockCrossCert1, mockCrossCert2)),
+            mockVerifierProvider,
+            mockCertificateSigner,
+            mockKeyDecoder,
+            mockPolicyProvider,
+            mockTimeProvider,
+            mockEndorsementMetadataProvider,
+            mockCertificateModifiersCreator,
+            mockAudienceBindingValidator,
+            mockMetrics);
+
+    when(mockVerifierProvider.getVerifier(any(AttestationEvidence.class)))
+        .thenReturn(Optional.of(mockAttestationVerifier));
+    when(mockAttestationVerifier.verify(
+            any(AttestationEvidence.class), any(PublicKey.class), any(ReferenceValues.class)))
+        .thenReturn(true);
+    when(mockKeyDecoder.decodeRawPublicKey(any())).thenReturn(keyPair.getPublic());
+    when(mockPolicyProvider.getPolicy(any(), any(), any()))
+        .thenReturn(Optional.of(createValidPolicy()));
+    when(mockEndorsementMetadataProvider.getAnnotations(any()))
+        .thenReturn(createValidEndorsementProperties());
+    when(mockEndorsementMetadataProvider.getValidity(any())).thenReturn(createValidity());
+    when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
+    when(mockTimeProvider.now()).thenReturn(testTime);
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
+    when(mockCertificateSigner.signCsr(
+            aryEq(csrBytes),
+            eq(mockRootCertificate),
+            eq(mockPrivateKey),
+            any(),
+            any(),
+            any(),
+            eq(new X500Principal("CN=policy-subject"))))
+        .thenReturn(mockChildCertificate);
+
+    List<X509Certificate> signedCerts =
+        serviceWithCrossCerts.issueCertificate(
+            request, createIdentityWithBinding(keyPair.getPublic()));
+
+    assertEquals(4, signedCerts.size());
+    assertEquals(mockChildCertificate, signedCerts.get(0));
+    assertEquals(
+        Set.of(mockCrossCert1, mockCrossCert2),
+        Set.copyOf(signedCerts.subList(1, signedCerts.size() - 1)));
+    assertEquals(mockRootCertificate, signedCerts.get(signedCerts.size() - 1));
   }
 }

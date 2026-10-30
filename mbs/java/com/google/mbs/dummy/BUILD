@@ -20,7 +20,7 @@ java_library(
     name = "dummy",
     srcs = [
         "DummyMbsModule.java",
-        "DummyMeasurementBoundCertificateProvider.java",
+        "DummyTrustPackageProvider.java",
         "NoOpMetrics.java",
     ],
     deps = [

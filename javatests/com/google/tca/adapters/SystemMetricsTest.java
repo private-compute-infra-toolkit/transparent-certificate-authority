@@ -17,14 +17,15 @@
 package com.google.tca.adapters;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.mbs.domain.Metrics.ReloadStatus.FAILURE;
-import static com.google.mbs.domain.Metrics.ReloadStatus.SUCCESS;
 
+import com.google.mbs.domain.Metrics.ConfigEvent;
+import com.google.mbs.domain.Metrics.GenerationEvent;
+import com.google.mbs.domain.Metrics.LoadEvent;
+import com.google.mbs.domain.Metrics.MbsEvent;
 import com.google.tca.domain.metric.IssuanceSubOperation;
 import com.google.tca.domain.metric.JwksCacheResult;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.time.Duration;
@@ -86,6 +87,42 @@ public class SystemMetricsTest {
               .timer()
               .count();
       assertThat(count).isEqualTo(0.0);
+    }
+
+    for (MbsEvent event : MbsEvent.values()) {
+      double value =
+          registry.get("tca.mbsStatus").tag("status", event.name().toLowerCase()).gauge().value();
+      assertThat(value).isEqualTo(0.0);
+    }
+
+    for (GenerationEvent event : GenerationEvent.values()) {
+      double value =
+          registry
+              .get("tca.mbsGenerationStatus")
+              .tag("status", event.name().toLowerCase())
+              .gauge()
+              .value();
+      assertThat(value).isEqualTo(0.0);
+    }
+
+    for (LoadEvent event : LoadEvent.values()) {
+      double value =
+          registry
+              .get("tca.mbsLoadStatus")
+              .tag("status", event.name().toLowerCase())
+              .gauge()
+              .value();
+      assertThat(value).isEqualTo(0.0);
+    }
+
+    for (ConfigEvent event : ConfigEvent.values()) {
+      double value =
+          registry
+              .get("tca.mbsConfigStatus")
+              .tag("status", event.name().toLowerCase())
+              .gauge()
+              .value();
+      assertThat(value).isEqualTo(0.0);
     }
   }
 
@@ -251,15 +288,50 @@ public class SystemMetricsTest {
   }
 
   @Test
-  public void setReloadStatus_updatesGaugeValue() {
-    Gauge gauge = registry.get("tca.certificate_reload_failed").gauge();
-    assertThat(gauge).isNotNull();
-    assertThat(gauge.value()).isEqualTo(0.0);
+  public void recordMbsEvents_updatesExclusiveStateGauges() {
+    systemMetrics.recordGenerationEvent(GenerationEvent.KMS_OPERATION_FAILED);
+    assertThat(
+            registry
+                .get("tca.mbsGenerationStatus")
+                .tag("status", "kms_operation_failed")
+                .gauge()
+                .value())
+        .isEqualTo(1.0);
+    assertThat(registry.get("tca.mbsGenerationStatus").tag("status", "success").gauge().value())
+        .isEqualTo(0.0);
 
-    systemMetrics.setReloadStatus(FAILURE);
-    assertThat(gauge.value()).isEqualTo(1.0);
+    systemMetrics.recordGenerationEvent(GenerationEvent.SUCCESS);
+    assertThat(
+            registry
+                .get("tca.mbsGenerationStatus")
+                .tag("status", "kms_operation_failed")
+                .gauge()
+                .value())
+        .isEqualTo(0.0);
+    assertThat(registry.get("tca.mbsGenerationStatus").tag("status", "success").gauge().value())
+        .isEqualTo(1.0);
 
-    systemMetrics.setReloadStatus(SUCCESS);
-    assertThat(gauge.value()).isEqualTo(0.0);
+    systemMetrics.recordLoadEvent(LoadEvent.BACKUP_NOT_FOUND);
+    assertThat(registry.get("tca.mbsLoadStatus").tag("status", "backup_not_found").gauge().value())
+        .isEqualTo(1.0);
+    assertThat(registry.get("tca.mbsLoadStatus").tag("status", "success").gauge().value())
+        .isEqualTo(0.0);
+
+    systemMetrics.recordConfigEvent(ConfigEvent.INVALID_CONFIGURATION_FILE);
+    assertThat(
+            registry
+                .get("tca.mbsConfigStatus")
+                .tag("status", "invalid_configuration_file")
+                .gauge()
+                .value())
+        .isEqualTo(1.0);
+    assertThat(registry.get("tca.mbsConfigStatus").tag("status", "success").gauge().value())
+        .isEqualTo(0.0);
+
+    String prometheusScrape = registry.scrape();
+    assertThat(prometheusScrape).contains("tca_mbsGenerationStatus{status=\"success\"} 1.0");
+    assertThat(prometheusScrape).contains("tca_mbsLoadStatus{status=\"backup_not_found\"} 1.0");
+    assertThat(prometheusScrape)
+        .contains("tca_mbsConfigStatus{status=\"invalid_configuration_file\"} 1.0");
   }
 }

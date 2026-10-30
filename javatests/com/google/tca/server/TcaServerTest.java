@@ -20,15 +20,18 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.SelfSignedBundle;
 import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
 import com.linecorp.armeria.client.WebClient;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import io.grpc.ServerServiceDefinition;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -43,8 +46,8 @@ public class TcaServerTest {
   private TrustedCertificateAuthorityGrpcHandler legacyService;
   private JwtInterceptor jwtInterceptor;
   private PrometheusMeterRegistry meterRegistry;
-  private MeasurementBoundCertificateProvider certificateProvider;
-  private MeasurementBoundCertificate mockCertificate;
+  private TrustPackageProvider certificateProvider;
+  private SelfSignedBundle mockBundle;
   private TcaServer tcaServer;
 
   @Before
@@ -58,8 +61,12 @@ public class TcaServerTest {
 
     jwtInterceptor = mock(JwtInterceptor.class);
     meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-    certificateProvider = mock(MeasurementBoundCertificateProvider.class);
-    mockCertificate = mock(MeasurementBoundCertificate.class);
+    certificateProvider = mock(TrustPackageProvider.class);
+    mockBundle =
+        new SelfSignedBundle(
+            mock(X509Certificate.class),
+            mock(PrivateKey.class),
+            AttestationToken.fromBytes(new byte[0]));
   }
 
   @After
@@ -72,7 +79,7 @@ public class TcaServerTest {
   @Test
   public void healthCheck_returnsOkWhenServingAndCertificateAvailable() {
     when(certificateProvider.getActiveTrustPackage())
-        .thenReturn(new TrustPackage(List.of(mockCertificate), List.of()));
+        .thenReturn(new TrustPackage(List.of(mockBundle), List.of()));
 
     tcaServer =
         new TcaServer(
@@ -84,6 +91,23 @@ public class TcaServerTest {
     WebClient client = WebClient.of("http://127.0.0.1:" + tcaServer.port());
     AggregatedHttpResponse response = client.get("/healthz").aggregate().join();
     assertThat(response.status()).isEqualTo(HttpStatus.OK);
+  }
+
+  @Test
+  public void healthCheck_returnsServiceUnavailableWhenSelfSignedBundlesEmpty() {
+    when(certificateProvider.getActiveTrustPackage())
+        .thenReturn(new TrustPackage(List.of(), List.of()));
+
+    tcaServer =
+        new TcaServer(
+            0, service, legacyService, jwtInterceptor, meterRegistry, certificateProvider);
+    tcaServer.start().join();
+
+    assertThat(tcaServer.isHealthy()).isFalse();
+
+    WebClient client = WebClient.of("http://127.0.0.1:" + tcaServer.port());
+    AggregatedHttpResponse response = client.get("/healthz").aggregate().join();
+    assertThat(response.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
   }
 
   @Test
@@ -108,7 +132,7 @@ public class TcaServerTest {
   @Test
   public void healthCheck_returnsServiceUnavailableWhenServerStopped() {
     when(certificateProvider.getActiveTrustPackage())
-        .thenReturn(new TrustPackage(List.of(mockCertificate), List.of()));
+        .thenReturn(new TrustPackage(List.of(mockBundle), List.of()));
 
     tcaServer =
         new TcaServer(

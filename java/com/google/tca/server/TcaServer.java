@@ -20,7 +20,7 @@ import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.flogger.FluentLogger;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.TrustPackageProvider;
 import com.linecorp.armeria.common.AggregatedHttpRequest;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpResponse;
@@ -52,7 +52,7 @@ public class TcaServer {
   private final Server server;
   private final HealthManager healthManager;
   private final int port;
-  private final MeasurementBoundCertificateProvider certificateProvider;
+  private final TrustPackageProvider trustPackageProvider;
 
   public TcaServer(
       int port,
@@ -60,10 +60,10 @@ public class TcaServer {
       TrustedCertificateAuthorityGrpcHandler legacyService,
       JwtInterceptor jwtInterceptor,
       PrometheusMeterRegistry meterRegistry,
-      MeasurementBoundCertificateProvider certificateProvider) {
+      TrustPackageProvider trustPackageProvider) {
     this.port = port;
-    this.certificateProvider =
-        Objects.requireNonNull(certificateProvider, "certificateProvider cannot be null");
+    this.trustPackageProvider =
+        Objects.requireNonNull(trustPackageProvider, "trustPackageProvider cannot be null");
     this.healthManager = new HealthManager();
 
     final GrpcService grpcService =
@@ -260,7 +260,7 @@ public class TcaServer {
       return false;
     }
     try {
-      return !certificateProvider.getActiveTrustPackage().bundles().isEmpty();
+      return !trustPackageProvider.getActiveTrustPackage().selfSignedBundles().isEmpty();
     } catch (IllegalStateException e) {
       logger.atFine().log("Healthcheck failed: certificate is not available yet.");
       return false;

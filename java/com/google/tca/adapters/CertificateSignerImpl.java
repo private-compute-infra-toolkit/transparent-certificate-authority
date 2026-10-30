@@ -16,7 +16,6 @@
 
 package com.google.tca.adapters;
 
-import com.google.common.flogger.FluentLogger;
 import com.google.tca.domain.CertificateModifier;
 import com.google.tca.domain.CertificateSigner;
 import com.google.tca.domain.TimeProvider;
@@ -49,8 +48,6 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 @Singleton
 public class CertificateSignerImpl implements CertificateSigner {
-  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
-
   static {
     Security.addProvider(new BouncyCastleProvider());
   }
@@ -87,7 +84,7 @@ public class CertificateSignerImpl implements CertificateSigner {
               new JcaPEMKeyConverter().getPublicKey(csr.getSubjectPublicKeyInfo()));
 
       JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
-      AuthorityKeyIdentifier aki = createAuthorityKeyIdentifier(extUtils, issuerCert);
+      AuthorityKeyIdentifier aki = createAuthorityKeyIdentifier(issuerCert);
       SubjectKeyIdentifier ski = extUtils.createSubjectKeyIdentifier(csr.getSubjectPublicKeyInfo());
 
       certBuilder.addExtension(Extension.authorityKeyIdentifier, false, aki);
@@ -98,19 +95,26 @@ public class CertificateSignerImpl implements CertificateSigner {
       ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerPrivateKey);
 
       return new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
+    } catch (CertificateException e) {
+      throw e;
     } catch (OperatorCreationException | GeneralSecurityException e) {
       throw new CertificateException(e);
     }
   }
 
-  private AuthorityKeyIdentifier createAuthorityKeyIdentifier(
-      JcaX509ExtensionUtils extUtils, X509Certificate issuerCert) throws CertificateException {
-    if (issuerCert.getExtensionValue(Extension.subjectKeyIdentifier.getId()) != null) {
-      return extUtils.createAuthorityKeyIdentifier(issuerCert);
+  private AuthorityKeyIdentifier createAuthorityKeyIdentifier(X509Certificate issuerCert)
+      throws CertificateException, IOException {
+    byte[] skiExtValue = issuerCert.getExtensionValue(Extension.subjectKeyIdentifier.getId());
+    if (skiExtValue == null) {
+      throw new CertificateException(
+          "Issuer certificate is missing Subject Key Identifier (SKI) extension");
     }
-    logger.atWarning().log(
-        "Issuer certificate is missing Subject Key Identifier (SKI), which is required by"
-            + " RFC 5280. Falling back to public key hashing.");
-    return extUtils.createAuthorityKeyIdentifier(issuerCert.getPublicKey());
+    // Populate only keyIdentifier (RFC 5280 Section 4.2.1.1) and omit authorityCertIssuer and
+    // authorityCertSerialNumber. BouncyCastle's createAuthorityKeyIdentifier(X509Certificate)
+    // embeds the issuer's serial and issuer DN, breaking X.509 path building across
+    // cross-signed root certificates during CA key rotation.
+    SubjectKeyIdentifier issuerSki =
+        SubjectKeyIdentifier.getInstance(JcaX509ExtensionUtils.parseExtensionValue(skiExtValue));
+    return new AuthorityKeyIdentifier(issuerSki.getKeyIdentifier());
   }
 }

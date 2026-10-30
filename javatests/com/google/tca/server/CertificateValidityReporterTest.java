@@ -20,11 +20,13 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.AttestationToken;
+import com.google.mbs.domain.SelfSignedBundle;
 import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
 import com.google.tca.domain.TimeProvider;
 import com.google.tca.domain.metric.Metrics;
+import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
@@ -46,6 +48,7 @@ public class CertificateValidityReporterTest {
   @Rule public final MockitoRule mockito = MockitoJUnit.rule();
 
   @Mock private X509Certificate mockCertificate;
+  @Mock private PrivateKey mockPrivateKey;
   @Mock private Metrics mockMetrics;
   @Mock private TimeProvider mockTimeProvider;
 
@@ -53,10 +56,13 @@ public class CertificateValidityReporterTest {
 
   @Before
   public void setUp() {
-    MeasurementBoundCertificateProvider certificateProvider =
+    TrustPackageProvider certificateProvider =
         () ->
             new TrustPackage(
-                List.of(new MeasurementBoundCertificate(mockCertificate, null, null)), List.of());
+                List.of(
+                    new SelfSignedBundle(
+                        mockCertificate, mockPrivateKey, AttestationToken.fromBytes(new byte[0]))),
+                List.of());
     reporter = new CertificateValidityReporter(certificateProvider, mockMetrics, mockTimeProvider);
   }
 

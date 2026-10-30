@@ -19,7 +19,10 @@ package com.google.tca.server;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.mbs.MbsCertificateFactory;
+import com.google.mbs.domain.SelfSignedCertificate;
+import com.google.mbs.domain.ValidityPeriod;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -30,6 +33,12 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class KmsModeModuleTest {
+
+  private static final SelfSignedCertificate TEST_CERT_PARAMS =
+      new SelfSignedCertificate(
+          1,
+          new ValidityPeriod(
+              Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-06-30T00:00:00Z")));
 
   @Test
   public void provideMbsCertificateFactory_generatesCertificateWithCorrectSpiffeIdInSan()
@@ -50,7 +59,7 @@ public class KmsModeModuleTest {
 
     // 2. Get the certificate factory & generate certificate
     MbsCertificateFactory factory = module.provideMbsCertificateFactory();
-    X509Certificate rootCert = factory.generate().certificate();
+    X509Certificate rootCert = factory.generate(TEST_CERT_PARAMS).certificate();
 
     // 3. Verify subject principal
     assertThat(rootCert.getSubjectX500Principal().getName())
@@ -90,7 +99,7 @@ public class KmsModeModuleTest {
 
     // 2. Get the certificate factory & generate certificate
     MbsCertificateFactory factory = module.provideMbsCertificateFactory();
-    X509Certificate rootCert = factory.generate().certificate();
+    X509Certificate rootCert = factory.generate(TEST_CERT_PARAMS).certificate();
 
     // 3. Verify subject principal
     assertThat(rootCert.getSubjectX500Principal().getName())

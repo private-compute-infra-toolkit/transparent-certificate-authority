@@ -18,19 +18,18 @@ package com.google.mbs.domain;
 
 import java.security.cert.X509Certificate;
 import java.util.List;
-import java.util.Objects;
 
 /**
- * Container holding lists of active measurement-bound bundles and cross-certificates.
+ * Container holding lists of active self-signed bundles and cross-signed certificates.
  *
- * @param bundles list of active measurement-bound bundles
+ * @param selfSignedBundles list of active self-signed bundles
  * @param crossSignedCertificates list of cross-signed X.509 certificates
  */
 public record TrustPackage(
-    List<MeasurementBoundCertificate> bundles, List<X509Certificate> crossSignedCertificates) {
+    List<SelfSignedBundle> selfSignedBundles, List<X509Certificate> crossSignedCertificates) {
 
   public TrustPackage {
-    Objects.requireNonNull(bundles, "bundles must not be null");
-    Objects.requireNonNull(crossSignedCertificates, "crossSignedCertificates must not be null");
+    selfSignedBundles = List.copyOf(selfSignedBundles);
+    crossSignedCertificates = List.copyOf(crossSignedCertificates);
   }
 }

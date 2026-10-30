@@ -17,6 +17,9 @@
 package com.google.tca.adapters;
 
 import com.google.common.flogger.FluentLogger;
+import com.google.mbs.domain.Metrics.ConfigEvent;
+import com.google.mbs.domain.Metrics.GenerationEvent;
+import com.google.mbs.domain.Metrics.LoadEvent;
 import com.google.mbs.domain.Metrics.MbsEvent;
 import com.google.tca.domain.metric.IssuanceSubOperation;
 import com.google.tca.domain.metric.JwksCacheResult;
@@ -47,11 +50,13 @@ public class SystemMetrics implements Metrics, com.google.mbs.domain.Metrics {
   private final Counter[] authenticationCounter;
   private final Counter[] processingCounter;
   private final AtomicInteger[] mbsStatusValues;
+  private final AtomicInteger[] mbsGenerationStatusValues;
+  private final AtomicInteger[] mbsLoadStatusValues;
+  private final AtomicInteger[] mbsConfigStatusValues;
   private final Set<String> approvedClients = ConcurrentHashMap.newKeySet();
   private final ConcurrentHashMap<String, Counter> issuanceCounters = new ConcurrentHashMap<>();
   private final AtomicLong rootCertificateValiditySeconds = new AtomicLong(0);
   private final AtomicBoolean rootCertificateValiditySecondsRegistered = new AtomicBoolean(false);
-  private final AtomicInteger certificateReloadFailed = new AtomicInteger(0);
   private final Counter[] jwksCacheLookupCounter;
   private final Timer jwksFetchTimer;
   private final Timer oidcAuthenticationTimer;
@@ -65,9 +70,11 @@ public class SystemMetrics implements Metrics, com.google.mbs.domain.Metrics {
     this.processingCounter =
         createCounters(PREFIX + "processingStatus", "status", ProcessingStatus.class);
     this.mbsStatusValues = createGauges(PREFIX + "mbsStatus", "status", MbsEvent.class);
-    Gauge.builder(PREFIX + "certificate_reload_failed", certificateReloadFailed, AtomicInteger::get)
-        .description("Indicates whether certificate reloading failed (0: success, 1: failed)")
-        .register(registry);
+    this.mbsGenerationStatusValues =
+        createGauges(PREFIX + "mbsGenerationStatus", "status", GenerationEvent.class);
+    this.mbsLoadStatusValues = createGauges(PREFIX + "mbsLoadStatus", "status", LoadEvent.class);
+    this.mbsConfigStatusValues =
+        createGauges(PREFIX + "mbsConfigStatus", "status", ConfigEvent.class);
     this.jwksCacheLookupCounter =
         createCounters(PREFIX + "oidc_jwks_cache_lookups", "result", JwksCacheResult.class);
     this.jwksFetchTimer =
@@ -140,9 +147,30 @@ public class SystemMetrics implements Metrics, com.google.mbs.domain.Metrics {
   }
 
   @Override
-  public void setReloadStatus(com.google.mbs.domain.Metrics.ReloadStatus status) {
-    certificateReloadFailed.set(
-        status == com.google.mbs.domain.Metrics.ReloadStatus.FAILURE ? 1 : 0);
+  public void recordGenerationEvent(GenerationEvent event) {
+    if (event != null) {
+      for (GenerationEvent e : GenerationEvent.class.getEnumConstants()) {
+        mbsGenerationStatusValues[e.ordinal()].set(e == event ? 1 : 0);
+      }
+    }
+  }
+
+  @Override
+  public void recordLoadEvent(LoadEvent event) {
+    if (event != null) {
+      for (LoadEvent e : LoadEvent.class.getEnumConstants()) {
+        mbsLoadStatusValues[e.ordinal()].set(e == event ? 1 : 0);
+      }
+    }
+  }
+
+  @Override
+  public void recordConfigEvent(ConfigEvent event) {
+    if (event != null) {
+      for (ConfigEvent e : ConfigEvent.class.getEnumConstants()) {
+        mbsConfigStatusValues[e.ordinal()].set(e == event ? 1 : 0);
+      }
+    }
   }
 
   @Override

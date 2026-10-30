@@ -17,11 +17,13 @@
 package com.google.mbs.dummy;
 
 import com.google.inject.AbstractModule;
-import com.google.mbs.adapters.MeasurementBoundCertificateMonitor;
+import com.google.mbs.adapters.ScheduledCertificateMonitor;
+import com.google.mbs.domain.CertificateGenerator;
 import com.google.mbs.domain.CertificateMonitor;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
-import com.google.mbs.domain.MeasurementBoundCertificateReloader;
+import com.google.mbs.domain.CertificatesConfigProvider;
 import com.google.mbs.domain.Metrics;
+import com.google.mbs.domain.TrustPackageProvider;
+import com.google.mbs.domain.TrustPackageReloader;
 import jakarta.inject.Singleton;
 
 /** Guice module for in-memory, self-signed Measurement Bound Storage used in local mode testing. */
@@ -29,14 +31,14 @@ public final class DummyMbsModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(DummyMeasurementBoundCertificateProvider.class).in(Singleton.class);
-    bind(MeasurementBoundCertificateProvider.class)
-        .to(DummyMeasurementBoundCertificateProvider.class);
-    bind(MeasurementBoundCertificateReloader.class)
-        .to(DummyMeasurementBoundCertificateProvider.class);
+    bind(DummyTrustPackageProvider.class).in(Singleton.class);
+    bind(TrustPackageProvider.class).to(DummyTrustPackageProvider.class);
+    bind(TrustPackageReloader.class).to(DummyTrustPackageProvider.class);
+    bind(CertificateGenerator.class).to(DummyTrustPackageProvider.class);
+    bind(CertificatesConfigProvider.class).to(DummyTrustPackageProvider.class);
 
     bind(Metrics.class).to(NoOpMetrics.class).in(Singleton.class);
 
-    bind(CertificateMonitor.class).to(MeasurementBoundCertificateMonitor.class).in(Singleton.class);
+    bind(CertificateMonitor.class).to(ScheduledCertificateMonitor.class).in(Singleton.class);
   }
 }

@@ -29,9 +29,11 @@ import com.google.inject.Injector;
 import com.google.inject.util.Modules;
 import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
-import com.google.mbs.domain.MeasurementBoundCertificate;
-import com.google.mbs.domain.MeasurementBoundCertificateProvider;
+import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedCertificate;
 import com.google.mbs.domain.TrustPackage;
+import com.google.mbs.domain.TrustPackageProvider;
+import com.google.mbs.domain.ValidityPeriod;
 import com.google.oak.attestation.v1.Endorsements;
 import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
@@ -63,10 +65,12 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -119,6 +123,7 @@ public class CertificateIssuanceIntegrationTest {
   private TransparentCertificateAuthorityGrpc.TransparentCertificateAuthorityBlockingStub
       baseBlockingStub;
   private PrivateKey jwtPrivateKey;
+  private AtomicReference<TrustPackage> activeTrustPackage;
 
   // Helper class to return both CSR and KeyPair from the helper method.
   private static class TestCsrAndKeyPair {
@@ -139,23 +144,25 @@ public class CertificateIssuanceIntegrationTest {
       java.security.Security.addProvider(new BouncyCastleProvider());
     }
 
-    // Create the MeasurementBoundCertificate instance to be used as a singleton in the test
+    Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
     MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
         MbsCertificateFactory.createSelfSignedCertificatesFactory(
                 new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
                 new X500Name("CN=TCA"),
-                Duration.ofDays(30),
                 Optional.of(
                     new GeneralNames(
                         new GeneralName(
                             GeneralName.uniformResourceIdentifier, "spiffe://tca.local.test"))),
                 KeyUsage.keyCertSign)
-            .generate();
+            .generate(
+                new SelfSignedCertificate(
+                    1, new ValidityPeriod(certStart, certStart.plus(Duration.ofDays(30)))));
 
     AttestationToken dummyToken = AttestationToken.fromBytes(new byte[0]);
-    final MeasurementBoundCertificate measurementBoundCertificate =
-        new MeasurementBoundCertificate(
-            certAndKey.certificate(), certAndKey.privateKey(), dummyToken);
+    final SelfSignedBundle selfSignedBundle =
+        new SelfSignedBundle(certAndKey.certificate(), certAndKey.privateKey(), dummyToken);
+    activeTrustPackage =
+        new AtomicReference<>(new TrustPackage(List.of(selfSignedBundle), List.of()));
 
     KeyPair jwtKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
     this.jwtPrivateKey = jwtKeyPair.getPrivate();
@@ -182,14 +189,7 @@ public class CertificateIssuanceIntegrationTest {
                         bind(AttestationVerifierProvider.class).toInstance(verifierProvider);
                         bind(FileFetcher.class).toInstance(fileFetcherStub);
                         bind(TimeProvider.class).toInstance(timeProvider);
-                        // Bind the specific instances
-                        bind(MeasurementBoundCertificate.class)
-                            .toInstance(measurementBoundCertificate);
-                        bind(MeasurementBoundCertificateProvider.class)
-                            .toInstance(
-                                () ->
-                                    new TrustPackage(
-                                        List.of(measurementBoundCertificate), List.of()));
+                        bind(TrustPackageProvider.class).toInstance(activeTrustPackage::get);
                         bind(new com.google.inject.TypeLiteral<
                                 io.jsonwebtoken.Locator<java.security.Key>>() {})
                             .annotatedWith(JwtAuth.class)
@@ -213,8 +213,7 @@ public class CertificateIssuanceIntegrationTest {
     JwtInterceptor jwtInterceptor = injector.getInstance(JwtInterceptor.class);
     PrometheusMeterRegistry meterRegistry = injector.getInstance(PrometheusMeterRegistry.class);
 
-    MeasurementBoundCertificateProvider certProvider =
-        injector.getInstance(MeasurementBoundCertificateProvider.class);
+    TrustPackageProvider certProvider = injector.getInstance(TrustPackageProvider.class);
 
     tcaServer =
         new TcaServer(
@@ -430,6 +429,28 @@ public class CertificateIssuanceIntegrationTest {
 
   @Test
   public void issueCertificate_validRequest_succeeds() throws Exception {
+    Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
+    ValidityPeriod validity = new ValidityPeriod(certStart, certStart.plus(Duration.ofDays(30)));
+    X509Certificate crossCert1 =
+        MbsCertificateFactory.createSelfSignedCertificatesFactory(
+                new MbsCertificateFactory.CertSignatureSpec("EC", 256, "SHA256withECDSA"),
+                new X500Name("CN=TCA Cross 1"),
+                Optional.empty(),
+                KeyUsage.keyCertSign)
+            .generate(new SelfSignedCertificate(2, validity))
+            .certificate();
+    X509Certificate crossCert2 =
+        MbsCertificateFactory.createSelfSignedCertificatesFactory(
+                new MbsCertificateFactory.CertSignatureSpec("EC", 256, "SHA256withECDSA"),
+                new X500Name("CN=TCA Cross 2"),
+                Optional.empty(),
+                KeyUsage.keyCertSign)
+            .generate(new SelfSignedCertificate(3, validity))
+            .certificate();
+    activeTrustPackage.set(
+        new TrustPackage(
+            activeTrustPackage.get().selfSignedBundles(), List.of(crossCert1, crossCert2)));
+
     TestCsrAndKeyPair testCsrAndKeyPair = createTestCsr();
     PKCS10CertificationRequest csr = testCsrAndKeyPair.csr;
     Instant testTime = Instant.parse("2026-03-05T12:00:00Z");
@@ -451,27 +472,25 @@ public class CertificateIssuanceIntegrationTest {
         withTokenForCsr(testCsrAndKeyPair.keyPair.getPublic()).issueCertificate(request);
 
     CertificateFactory cf = CertificateFactory.getInstance("X.509");
-
-    assertEquals(2, response.getSignedCertificatesCount());
-
-    X509Certificate signedCert =
-        (X509Certificate)
-            cf.generateCertificate(
-                new ByteArrayInputStream(response.getSignedCertificates(0).toByteArray()));
+    List<X509Certificate> certChain = new ArrayList<>();
+    for (ByteString certBytes : response.getSignedCertificatesList()) {
+      certChain.add(
+          (X509Certificate)
+              cf.generateCertificate(new ByteArrayInputStream(certBytes.toByteArray())));
+    }
 
     X509Certificate rootCert =
         injector
-            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getInstance(TrustPackageProvider.class)
             .getActiveTrustPackage()
-            .bundles()
+            .selfSignedBundles()
             .get(0)
-            .getCertificate();
+            .certificate();
 
-    X509Certificate responseRootCert =
-        (X509Certificate)
-            cf.generateCertificate(
-                new ByteArrayInputStream(response.getSignedCertificates(1).toByteArray()));
-    assertEquals(rootCert, responseRootCert);
+    assertThat(certChain).hasSize(4);
+    X509Certificate signedCert = certChain.get(0);
+    assertThat(certChain.subList(1, certChain.size() - 1)).containsExactly(crossCert1, crossCert2);
+    assertThat(certChain.get(certChain.size() - 1)).isEqualTo(rootCert);
 
     signedCert.verify(rootCert.getPublicKey());
     assertEquals("CN=test", signedCert.getSubjectX500Principal().getName());
@@ -572,11 +591,11 @@ public class CertificateIssuanceIntegrationTest {
 
     X509Certificate rootCert =
         injector
-            .getInstance(MeasurementBoundCertificateProvider.class)
+            .getInstance(TrustPackageProvider.class)
             .getActiveTrustPackage()
-            .bundles()
+            .selfSignedBundles()
             .get(0)
-            .getCertificate();
+            .certificate();
 
     X509Certificate responseRootCert =
         (X509Certificate)
