@@ -105,6 +105,8 @@ java_library(
         "@maven//:software_amazon_awssdk_s3",
         "@oak//proto/attestation:reference_value_java_proto",
         "@pcit_mbs//java/com/google/mbs",
+        "@pcit_mbs//java/com/google/mbs/adapters",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )
 

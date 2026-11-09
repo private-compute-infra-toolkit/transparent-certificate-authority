@@ -18,6 +18,7 @@ package com.google.tca.server;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.FluentLogger;
 import com.google.inject.AbstractModule;
@@ -74,6 +75,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 /** Guice module for the TCA service. */
 public class TransparentCaModule extends AbstractModule {
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+  private static final ImmutableList<String> ALLOWED_METER_PREFIXES =
+      ImmutableList.of("tca.", "armeria.server.connections", "jvm.", "system.", "process.");
 
   public TransparentCaModule() {}
 
@@ -170,12 +173,9 @@ public class TransparentCaModule extends AbstractModule {
     PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
     registry
         .config()
-        .meterFilter(MeterFilter.acceptNameStartsWith("tca."))
-        .meterFilter(MeterFilter.acceptNameStartsWith("armeria.server.connections"))
-        .meterFilter(MeterFilter.acceptNameStartsWith("jvm."))
-        .meterFilter(MeterFilter.acceptNameStartsWith("system."))
-        .meterFilter(MeterFilter.acceptNameStartsWith("process."))
-        .meterFilter(MeterFilter.deny());
+        .meterFilter(
+            MeterFilter.denyUnless(
+                id -> ALLOWED_METER_PREFIXES.stream().anyMatch(id.getName()::startsWith)));
     new JvmMemoryMetrics().bindTo(registry);
     new JvmThreadMetrics().bindTo(registry);
     new ProcessorMetrics().bindTo(registry);

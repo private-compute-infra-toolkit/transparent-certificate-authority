@@ -18,8 +18,8 @@ package com.google.tca.server;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.domain.SelfSignedCertificate;
+import com.google.mbs.domain.SelfSignedCertificateFactory;
 import com.google.mbs.domain.ValidityPeriod;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
@@ -41,7 +41,7 @@ public class KmsModeModuleTest {
               Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-06-30T00:00:00Z")));
 
   @Test
-  public void provideMbsCertificateFactory_generatesCertificateWithCorrectSpiffeIdInSan()
+  public void provideSelfSignedCertificateFactory_generatesCertificateWithCorrectSpiffeIdInSan()
       throws Exception {
     // 1. Setup module with test metadata
     String testEnv = "testenv";
@@ -58,12 +58,12 @@ public class KmsModeModuleTest {
     KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
 
     // 2. Get the certificate factory & generate certificate
-    MbsCertificateFactory factory = module.provideMbsCertificateFactory();
+    SelfSignedCertificateFactory factory = module.provideSelfSignedCertificateFactory();
     X509Certificate rootCert = factory.generate(TEST_CERT_PARAMS).certificate();
 
     // 3. Verify subject principal
     assertThat(rootCert.getSubjectX500Principal().getName())
-        .isEqualTo("CN=TCA Root,O=Google LLC,C=US");
+        .isEqualTo("CN=TCA Root G1,O=Google LLC,C=US");
 
     // 4. Verify the constructed SPIFFE ID in the SAN extension
     String expectedSpiffeId =
@@ -82,7 +82,8 @@ public class KmsModeModuleTest {
   }
 
   @Test
-  public void provideMbsCertificateFactory_prodEnv_stripsAwsSubdomainAndOmitEnv() throws Exception {
+  public void provideSelfSignedCertificateFactory_prodEnv_stripsAwsSubdomainAndOmitEnv()
+      throws Exception {
     // 1. Setup module with prod metadata and "aws." subdomain
     String testEnv = "prod";
     String testDomain = "aws.pcit.goog";
@@ -98,12 +99,12 @@ public class KmsModeModuleTest {
     KmsModeModule module = new KmsModeModule(kmsArgs, awsInstanceMetadata);
 
     // 2. Get the certificate factory & generate certificate
-    MbsCertificateFactory factory = module.provideMbsCertificateFactory();
+    SelfSignedCertificateFactory factory = module.provideSelfSignedCertificateFactory();
     X509Certificate rootCert = factory.generate(TEST_CERT_PARAMS).certificate();
 
     // 3. Verify subject principal
     assertThat(rootCert.getSubjectX500Principal().getName())
-        .isEqualTo("CN=TCA Root,O=Google LLC,C=US");
+        .isEqualTo("CN=TCA Root G1,O=Google LLC,C=US");
 
     // 4. Verify the constructed SPIFFE ID in the SAN extension (should be tca.pcit.goog)
     String expectedSpiffeId =

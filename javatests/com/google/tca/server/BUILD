@@ -140,6 +140,8 @@ java_test(
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
         "@pcit_mbs//java/com/google/mbs",
+        "@pcit_mbs//java/com/google/mbs/adapters",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )
 
@@ -196,6 +198,8 @@ java_test(
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
         "@pcit_mbs//java/com/google/mbs",
+        "@pcit_mbs//java/com/google/mbs/adapters",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )
 
@@ -217,6 +221,8 @@ java_test(
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",
         "@pcit_mbs//java/com/google/mbs",
+        "@pcit_mbs//java/com/google/mbs/adapters",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )
 
@@ -260,6 +266,8 @@ java_test(
         "@oak//proto/attestation:endorsement_java_proto",
         "@oak//proto/attestation:evidence_java_proto",
         "@pcit_mbs//java/com/google/mbs",
+        "@pcit_mbs//java/com/google/mbs/adapters",
+        "@pcit_mbs//java/com/google/mbs/domain",
     ],
 )
 

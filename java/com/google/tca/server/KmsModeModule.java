@@ -20,9 +20,10 @@ import com.google.common.flogger.FluentLogger;
 import com.google.gson.Gson;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.google.mbs.MbsCertificateFactory;
 import com.google.mbs.MbsModule;
+import com.google.mbs.adapters.DefaultSelfSignedCertificateFactory;
 import com.google.mbs.domain.Metrics;
+import com.google.mbs.domain.SelfSignedCertificateFactory;
 import com.google.mbs.qualifier.AttestationUserData;
 import com.google.mbs.qualifier.InstanceId;
 import com.google.mbs.qualifier.KmsKeyArn;
@@ -99,7 +100,7 @@ public class KmsModeModule extends AbstractModule {
 
   @Provides
   @Singleton
-  MbsCertificateFactory provideMbsCertificateFactory() {
+  SelfSignedCertificateFactory provideSelfSignedCertificateFactory() {
     String env = awsInstanceMetadata.environment();
     String domain = awsInstanceMetadata.domain();
     String operatorRole = awsInstanceMetadata.accountId();
@@ -112,8 +113,8 @@ public class KmsModeModule extends AbstractModule {
     Optional<GeneralNames> san = Optional.of(new GeneralNames(uriSan));
     logger.atInfo().log("Setting root certificate Subject Alternative Name (SAN): %s", spiffeId);
 
-    return MbsCertificateFactory.createSelfSignedCertificatesFactory(
-        new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
+    return new DefaultSelfSignedCertificateFactory(
+        new DefaultSelfSignedCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
         new X500Name("C=US, O=Google LLC, CN=TCA Root"),
         san,
         KeyUsage.keyCertSign);

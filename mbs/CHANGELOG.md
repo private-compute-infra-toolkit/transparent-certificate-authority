@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.15.0 (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* TrustPackage.selfSignedBundles() returns
+List<SelfSignedBundleWithEpoch>; use bundle() to get the
+SelfSignedBundle.
+
+
+### Features
+
+* expose epoch ID of self-signed bundles in TrustPackage
+
+
+### Bug Fixes
+
+* Reuse unchanged cross-signed certs on reload
+
+
+### Documentation
+
+* Create agent-focused documentation on certs rotation testing
+
+## 0.14.0 (2026-10-30)
+
+
+### Features
+
+* add CrossSignedCertificateBackupGenerator
+* generate cross-signed certs in DefaultCertificateGenerator
+* preserve order in TrustPackageService defined by config
+* record active self-signed and cross-signed certificate metrics
+* suffix self-signed certificate CN with epoch ID
+* verify cross-signed certs against linked self-signed bundles
+
 ## 0.13.0 (2026-10-26)
 
 

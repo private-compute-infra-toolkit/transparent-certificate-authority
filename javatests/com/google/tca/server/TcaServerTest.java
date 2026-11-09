@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedBundleWithEpoch;
 import com.google.mbs.domain.TrustPackage;
 import com.google.mbs.domain.TrustPackageProvider;
 import com.linecorp.armeria.client.WebClient;
@@ -79,7 +80,8 @@ public class TcaServerTest {
   @Test
   public void healthCheck_returnsOkWhenServingAndCertificateAvailable() {
     when(certificateProvider.getActiveTrustPackage())
-        .thenReturn(new TrustPackage(List.of(mockBundle), List.of()));
+        .thenReturn(
+            new TrustPackage(List.of(new SelfSignedBundleWithEpoch(0, mockBundle)), List.of()));
 
     tcaServer =
         new TcaServer(
@@ -132,7 +134,8 @@ public class TcaServerTest {
   @Test
   public void healthCheck_returnsServiceUnavailableWhenServerStopped() {
     when(certificateProvider.getActiveTrustPackage())
-        .thenReturn(new TrustPackage(List.of(mockBundle), List.of()));
+        .thenReturn(
+            new TrustPackage(List.of(new SelfSignedBundleWithEpoch(0, mockBundle)), List.of()));
 
     tcaServer =
         new TcaServer(

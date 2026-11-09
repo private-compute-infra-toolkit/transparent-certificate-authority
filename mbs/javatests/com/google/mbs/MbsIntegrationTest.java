@@ -28,6 +28,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.mbs.adapters.CertificatesConfigMapper;
+import com.google.mbs.adapters.DefaultSelfSignedCertificateFactory;
 import com.google.mbs.adapters.PemCertificateCodec;
 import com.google.mbs.adapters.S3BackupPaths;
 import com.google.mbs.adapters.ScheduledCertificateMonitor;
@@ -37,10 +38,12 @@ import com.google.mbs.domain.CrossSignedCertificateId;
 import com.google.mbs.domain.KmsClientInterface;
 import com.google.mbs.domain.Metrics;
 import com.google.mbs.domain.SelfSignedBundle;
-import com.google.mbs.domain.SelfSignedCertificate;
+import com.google.mbs.domain.SelfSignedBundleWithEpoch;
+import com.google.mbs.domain.SelfSignedCertificateFactory;
 import com.google.mbs.domain.TrustPackage;
 import com.google.mbs.domain.TrustPackageProvider;
 import com.google.mbs.domain.ValidityPeriod;
+import com.google.mbs.dummy.NoOpMetrics;
 import com.google.mbs.qualifier.AttestationUserData;
 import com.google.mbs.qualifier.InstanceId;
 import com.google.mbs.qualifier.KmsKeyArn;
@@ -103,7 +106,6 @@ public class MbsIntegrationTest {
 
   private FakeKmsClient fakeKmsClient;
   private FakeAttestationCollector fakeAttestationCollector;
-  private FakeMetrics fakeMetrics;
 
   @BeforeClass
   public static void setUpClass() {
@@ -176,7 +178,6 @@ public class MbsIntegrationTest {
   public void setUp() {
     fakeKmsClient = new FakeKmsClient();
     fakeAttestationCollector = new FakeAttestationCollector();
-    fakeMetrics = new FakeMetrics();
 
     s3TestClient.createBucket(PUBLIC_BUCKET);
     s3TestClient.createBucket(PRIVATE_BUCKET);
@@ -194,16 +195,16 @@ public class MbsIntegrationTest {
     return createTestInjector(instanceId, "CN=Test MBS Root");
   }
 
-  private static MbsCertificateFactory createCertFactory(String commonName) {
-    return MbsCertificateFactory.createSelfSignedCertificatesFactory(
-        new MbsCertificateFactory.CertSignatureSpec("RSA", 2048, "SHA256withRSA"),
+  private static SelfSignedCertificateFactory createCertFactory(String commonName) {
+    return new DefaultSelfSignedCertificateFactory(
+        new DefaultSelfSignedCertificateFactory.CertSignatureSpec("RSA", 2048, "SHA256withRSA"),
         new X500Name(commonName),
         Optional.empty(),
         KeyUsage.keyCertSign);
   }
 
   private Injector createTestInjector(String instanceId, String commonName) {
-    MbsCertificateFactory certFactory = createCertFactory(commonName);
+    SelfSignedCertificateFactory certFactory = createCertFactory(commonName);
 
     return Guice.createInjector(
         new MbsCoreModule(),
@@ -213,13 +214,13 @@ public class MbsIntegrationTest {
             bind(KmsClientInterface.class).toInstance(fakeKmsClient);
             bind(AttestationCollector.class).toInstance(fakeAttestationCollector);
             bind(S3Client.class).toInstance(s3Client);
-            bind(Metrics.class).toInstance(fakeMetrics);
+            bind(Metrics.class).to(NoOpMetrics.class);
             bind(String.class).annotatedWith(PublicBackupBucket.class).toInstance(PUBLIC_BUCKET);
             bind(String.class).annotatedWith(PrivateBackupBucket.class).toInstance(PRIVATE_BUCKET);
             bind(String.class).annotatedWith(KmsKeyArn.class).toInstance(KMS_KEY_ARN);
             bind(String.class).annotatedWith(InstanceId.class).toInstance(instanceId);
             bind(byte[].class).annotatedWith(AttestationUserData.class).toInstance(TEST_USER_DATA);
-            bind(MbsCertificateFactory.class).toInstance(certFactory);
+            bind(SelfSignedCertificateFactory.class).toInstance(certFactory);
           }
         });
   }
@@ -232,22 +233,7 @@ public class MbsIntegrationTest {
     TrustPackage trustPackage = provider.getActiveTrustPackage();
     assertEquals(1, trustPackage.selfSignedBundles().size());
     assertTrue(trustPackage.crossSignedCertificates().isEmpty());
-    return trustPackage.selfSignedBundles().get(0);
-  }
-
-  // TODO(b/556648211): replace with chaining cross signed certificates once we can generate them
-  private static X509Certificate putCrossSignedCert(CrossSignedCertificateId id) throws Exception {
-    X509Certificate cert =
-        createCertFactory("CN=Cross " + id.toKeyString())
-            .generate(
-                new SelfSignedCertificate(
-                    0, new ValidityPeriod(Instant.EPOCH, Instant.ofEpochSecond(1))))
-            .certificate();
-    s3TestClient.putFile(
-        PUBLIC_BUCKET,
-        S3BackupPaths.getCrossSignedCertificatePath(id),
-        new PemCertificateCodec().toBytes(cert));
-    return cert;
+    return trustPackage.selfSignedBundles().get(0).bundle();
   }
 
   private static String configTextproto(
@@ -308,22 +294,17 @@ public class MbsIntegrationTest {
     assertEquals(config.selfSignedCertificates().size(), trustPackage.selfSignedBundles().size());
     assertTrue(trustPackage.crossSignedCertificates().isEmpty());
 
-    for (SelfSignedBundle bundle : trustPackage.selfSignedBundles()) {
-      assertNotNull(bundle.certificate());
+    for (SelfSignedBundleWithEpoch epochBundle : trustPackage.selfSignedBundles()) {
+      SelfSignedBundle bundle = epochBundle.bundle();
       assertNotNull(bundle.privateKey());
       assertNotNull(bundle.attestationToken());
-      assertEquals("CN=Test MBS Root", bundle.certificate().getSubjectX500Principal().getName());
-    }
-
-    for (SelfSignedCertificate expectedCert : config.selfSignedCertificates().values()) {
-      ValidityPeriod expectedValidity = expectedCert.validityPeriod();
-      assertTrue(
-          trustPackage.selfSignedBundles().stream()
-              .map(SelfSignedBundle::certificate)
-              .anyMatch(
-                  cert ->
-                      cert.getNotBefore().toInstant().equals(expectedValidity.notBefore())
-                          && cert.getNotAfter().toInstant().equals(expectedValidity.notAfter())));
+      X509Certificate cert = bundle.certificate();
+      ValidityPeriod expectedValidity =
+          config.selfSignedCertificates().get(epochBundle.epochId()).validityPeriod();
+      assertEquals(
+          "CN=Test MBS Root G" + epochBundle.epochId(), cert.getSubjectX500Principal().getName());
+      assertEquals(expectedValidity.notBefore(), cert.getNotBefore().toInstant());
+      assertEquals(expectedValidity.notAfter(), cert.getNotAfter().toInstant());
     }
   }
 
@@ -354,10 +335,6 @@ public class MbsIntegrationTest {
 
     runMonitorIteration(injector);
 
-    assertEquals(Metrics.ConfigEvent.SUCCESS, fakeMetrics.lastConfigEvent);
-    assertEquals(Metrics.GenerationEvent.SUCCESS, fakeMetrics.lastGenerationEvent);
-    assertEquals(Metrics.LoadEvent.STORED_BACKUP_CORRUPTED, fakeMetrics.lastLoadEvent);
-    assertEquals(Metrics.MbsEvent.FAILURE, fakeMetrics.lastMbsEvent);
     // Missing epoch 1 was generated, while corrupted epoch 0 was not overwritten.
     assertTrue(s3TestClient.fileExists(PUBLIC_BUCKET, S3BackupPaths.getRootCertPath(1)));
     assertArrayEquals(
@@ -438,7 +415,7 @@ public class MbsIntegrationTest {
     runMonitorIteration(runningInjector);
     SelfSignedBundle epoch0Bundle = singleActiveBundle(runningProvider);
     assertEquals(
-        "CN=Initial MBS Root", epoch0Bundle.certificate().getSubjectX500Principal().getName());
+        "CN=Initial MBS Root G0", epoch0Bundle.certificate().getSubjectX500Principal().getName());
     assertFalse(s3TestClient.fileExists(PUBLIC_BUCKET, S3BackupPaths.getRootCertPath(1)));
 
     // Normal operation: verify active signing works with Certificate A's keypair
@@ -455,8 +432,6 @@ public class MbsIntegrationTest {
     // 2. Pre-rotation step: epoch 1 and cross-signed certs are added (inactive) in S3
     CrossSignedCertificateId id01 = new CrossSignedCertificateId(0, 1);
     CrossSignedCertificateId id10 = new CrossSignedCertificateId(1, 0);
-    X509Certificate cross01Cert = putCrossSignedCert(id01);
-    X509Certificate cross10Cert = putCrossSignedCert(id10);
     s3TestClient.putFile(
         PUBLIC_BUCKET,
         S3BackupPaths.CERTIFICATES_CONFIG_FILE_PATH,
@@ -467,11 +442,29 @@ public class MbsIntegrationTest {
         rotationInjector.getInstance(TrustPackageProvider.class);
     runMonitorIteration(rotationInjector);
     assertTrue(s3TestClient.fileExists(PUBLIC_BUCKET, S3BackupPaths.getRootCertPath(1)));
+    assertTrue(
+        s3TestClient.fileExists(PUBLIC_BUCKET, S3BackupPaths.getCrossSignedCertificatePath(id01)));
+    assertTrue(
+        s3TestClient.fileExists(PUBLIC_BUCKET, S3BackupPaths.getCrossSignedCertificatePath(id10)));
+
+    PemCertificateCodec codec = new PemCertificateCodec();
     X509Certificate epoch1Cert =
-        new PemCertificateCodec()
-            .toCertificate(s3TestClient.getFile(PUBLIC_BUCKET, S3BackupPaths.getRootCertPath(1)));
-    assertEquals("CN=Rotated MBS Root", epoch1Cert.getSubjectX500Principal().getName());
+        codec.toCertificate(s3TestClient.getFile(PUBLIC_BUCKET, S3BackupPaths.getRootCertPath(1)));
+    assertEquals("CN=Rotated MBS Root G1", epoch1Cert.getSubjectX500Principal().getName());
     assertNotEquals(epoch0Bundle.certificate().getSerialNumber(), epoch1Cert.getSerialNumber());
+
+    X509Certificate cross01Cert =
+        codec.toCertificate(
+            s3TestClient.getFile(PUBLIC_BUCKET, S3BackupPaths.getCrossSignedCertificatePath(id01)));
+    cross01Cert.verify(epoch0Bundle.certificate().getPublicKey());
+    assertEquals(epoch1Cert.getPublicKey(), cross01Cert.getPublicKey());
+
+    X509Certificate cross10Cert =
+        codec.toCertificate(
+            s3TestClient.getFile(PUBLIC_BUCKET, S3BackupPaths.getCrossSignedCertificatePath(id10)));
+    cross10Cert.verify(epoch1Cert.getPublicKey());
+    assertEquals(epoch0Bundle.certificate().getPublicKey(), cross10Cert.getPublicKey());
+
     assertEquals(epoch0Bundle, singleActiveBundle(rotationProvider));
 
     // 3. Rotation step 1 (dual-active): epoch 1 and cross-signed certs are activated
@@ -493,10 +486,13 @@ public class MbsIntegrationTest {
     runMonitorIteration(runningInjector);
     TrustPackage dualActivePackage = runningProvider.getActiveTrustPackage();
     assertEquals(rotationPackage, dualActivePackage);
-    assertTrue(dualActivePackage.selfSignedBundles().contains(epoch0Bundle));
+    assertTrue(
+        dualActivePackage
+            .selfSignedBundles()
+            .contains(new SelfSignedBundleWithEpoch(0, epoch0Bundle)));
     assertTrue(
         dualActivePackage.selfSignedBundles().stream()
-            .anyMatch(b -> b.certificate().equals(epoch1Cert)));
+            .anyMatch(b -> b.epochId() == 1 && b.bundle().certificate().equals(epoch1Cert)));
 
     // 5. Rotation step 2: epoch 0 and cross-signed certs are deactivated, leaving only epoch 1
     s3TestClient.putFile(
@@ -507,6 +503,7 @@ public class MbsIntegrationTest {
 
     SelfSignedBundle activeBundle = singleActiveBundle(runningProvider);
     assertEquals(epoch1Cert, activeBundle.certificate());
+    assertEquals(1, runningProvider.getActiveTrustPackage().selfSignedBundles().get(0).epochId());
 
     // Verify normal operation with new keypair: signing and verifying with Certificate B
     Signature sigB = Signature.getInstance("SHA256withRSA");
@@ -551,7 +548,6 @@ public class MbsIntegrationTest {
     runMonitorIteration(injector);
     TrustPackage initialPackage = provider.getActiveTrustPackage();
     assertEquals(1, initialPackage.selfSignedBundles().size());
-    assertEquals(Metrics.MbsEvent.SUCCESS, fakeMetrics.lastMbsEvent);
 
     // Hold the generation lock so newly configured certificates cannot be generated.
     s3TestClient.putFile(
@@ -563,10 +559,6 @@ public class MbsIntegrationTest {
 
     runMonitorIteration(injector);
 
-    assertEquals(Metrics.ConfigEvent.SUCCESS, fakeMetrics.lastConfigEvent);
-    assertEquals(Metrics.GenerationEvent.WAITING_FOR_MBS_LOCK, fakeMetrics.lastGenerationEvent);
-    assertEquals(Metrics.LoadEvent.BACKUP_NOT_FOUND, fakeMetrics.lastLoadEvent);
-    assertEquals(Metrics.MbsEvent.FAILURE, fakeMetrics.lastMbsEvent);
     assertEquals(initialPackage, provider.getActiveTrustPackage());
   }
 
@@ -578,7 +570,6 @@ public class MbsIntegrationTest {
 
     runMonitorIteration(injector);
     assertEquals(2, provider.getActiveTrustPackage().selfSignedBundles().size());
-    assertEquals(Metrics.MbsEvent.SUCCESS, fakeMetrics.lastMbsEvent);
     X509Certificate epoch0Cert =
         new PemCertificateCodec()
             .toCertificate(s3TestClient.getFile(PUBLIC_BUCKET, S3BackupPaths.getRootCertPath(0)));
@@ -593,8 +584,6 @@ public class MbsIntegrationTest {
 
     runMonitorIteration(injector);
 
-    assertEquals(Metrics.ConfigEvent.INVALID_CONFIGURATION_FILE, fakeMetrics.lastConfigEvent);
-    assertEquals(Metrics.MbsEvent.SUCCESS, fakeMetrics.lastMbsEvent);
     assertEquals(epoch0Cert, singleActiveBundle(provider).certificate());
   }
 
@@ -632,32 +621,5 @@ public class MbsIntegrationTest {
     assertTrue(s3TestClient.listFiles(testBucket).isEmpty());
 
     s3TestClient.deleteBucket(testBucket);
-  }
-
-  private static final class FakeMetrics implements Metrics {
-    volatile MbsEvent lastMbsEvent;
-    volatile GenerationEvent lastGenerationEvent;
-    volatile LoadEvent lastLoadEvent;
-    volatile ConfigEvent lastConfigEvent;
-
-    @Override
-    public void recordEvent(MbsEvent event) {
-      this.lastMbsEvent = event;
-    }
-
-    @Override
-    public void recordGenerationEvent(GenerationEvent event) {
-      this.lastGenerationEvent = event;
-    }
-
-    @Override
-    public void recordLoadEvent(LoadEvent event) {
-      this.lastLoadEvent = event;
-    }
-
-    @Override
-    public void recordConfigEvent(ConfigEvent event) {
-      this.lastConfigEvent = event;
-    }
   }
 }

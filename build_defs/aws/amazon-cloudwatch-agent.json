@@ -56,6 +56,12 @@
             {
               "source_labels": ["job"],
               "label_matcher": "^tca$",
+              "dimensions": [["epoch"]],
+              "metric_selectors": ["^tca_mbsActiveSelfSignedCertificate$", "^tca_mbsActiveCrossSignedCertificate$"]
+            },
+            {
+              "source_labels": ["job"],
+              "label_matcher": "^tca$",
               "dimensions": [["result"]],
               "metric_selectors": ["^tca_oidc_jwks_cache_lookups_total$"]
             },

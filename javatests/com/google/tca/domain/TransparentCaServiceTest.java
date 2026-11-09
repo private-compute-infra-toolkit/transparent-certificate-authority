@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.io.BaseEncoding;
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedBundleWithEpoch;
 import com.google.mbs.domain.TrustPackage;
 import com.google.mbs.domain.TrustPackageProvider;
 import com.google.protobuf.ByteString;
@@ -119,10 +120,12 @@ public class TransparentCaServiceTest {
         () ->
             new TrustPackage(
                 List.of(
-                    new SelfSignedBundle(
-                        mockRootCertificate,
-                        mockPrivateKey,
-                        AttestationToken.fromBytes(new byte[0]))),
+                    new SelfSignedBundleWithEpoch(
+                        0,
+                        new SelfSignedBundle(
+                            mockRootCertificate,
+                            mockPrivateKey,
+                            AttestationToken.fromBytes(new byte[0])))),
                 List.of());
     transparentCaService =
         new TransparentCaService(
@@ -545,7 +548,9 @@ public class TransparentCaServiceTest {
 
     TransparentCaService dynamicService =
         new TransparentCaService(
-            () -> new TrustPackage(List.of(currentCertRef.get()), List.of()),
+            () ->
+                new TrustPackage(
+                    List.of(new SelfSignedBundleWithEpoch(0, currentCertRef.get())), List.of()),
             mockVerifierProvider,
             mockCertificateSigner,
             mockKeyDecoder,
@@ -629,7 +634,10 @@ public class TransparentCaServiceTest {
             mockRootCertificate, mockPrivateKey, AttestationToken.fromBytes(new byte[0]));
     TransparentCaService serviceWithCrossCerts =
         new TransparentCaService(
-            () -> new TrustPackage(List.of(rootBundle), List.of(mockCrossCert1, mockCrossCert2)),
+            () ->
+                new TrustPackage(
+                    List.of(new SelfSignedBundleWithEpoch(0, rootBundle)),
+                    List.of(mockCrossCert1, mockCrossCert2)),
             mockVerifierProvider,
             mockCertificateSigner,
             mockKeyDecoder,

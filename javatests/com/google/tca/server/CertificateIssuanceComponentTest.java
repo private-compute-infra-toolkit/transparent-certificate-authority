@@ -29,10 +29,12 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Provides;
 import com.google.inject.util.Modules;
-import com.google.mbs.MbsCertificateFactory;
+import com.google.mbs.adapters.DefaultSelfSignedCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedBundleWithEpoch;
 import com.google.mbs.domain.SelfSignedCertificate;
+import com.google.mbs.domain.SelfSignedCertificateFactory;
 import com.google.mbs.domain.TrustPackage;
 import com.google.mbs.domain.TrustPackageProvider;
 import com.google.mbs.domain.ValidityPeriod;
@@ -125,9 +127,10 @@ public class CertificateIssuanceComponentTest {
                             "javatests/com/google/tca/server/testdata/reference_values.textproto"))));
 
     Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
-    MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
-        MbsCertificateFactory.createSelfSignedCertificatesFactory(
-                new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
+    SelfSignedCertificateFactory.X509CertificateAndPrivateKey certAndKey =
+        new DefaultSelfSignedCertificateFactory(
+                new DefaultSelfSignedCertificateFactory.CertSignatureSpec(
+                    "RSA", 4096, "SHA256withRSA"),
                 new X500Name("CN=TCA Local"),
                 Optional.of(
                     new GeneralNames(
@@ -154,7 +157,11 @@ public class CertificateIssuanceComponentTest {
                         bind(FileFetcher.class).toInstance(fileFetcher);
                         bind(TimeProvider.class).toInstance(mockTimeProvider);
                         bind(TrustPackageProvider.class)
-                            .toInstance(() -> new TrustPackage(List.of(cert), List.of()));
+                            .toInstance(
+                                () ->
+                                    new TrustPackage(
+                                        List.of(new SelfSignedBundleWithEpoch(0, cert)),
+                                        List.of()));
                         bind(AwsInstanceMetadata.class)
                             .toInstance(
                                 AwsInstanceMetadata.builder()
@@ -181,6 +188,7 @@ public class CertificateIssuanceComponentTest {
             .getActiveTrustPackage()
             .selfSignedBundles()
             .get(0)
+            .bundle()
             .certificate();
   }
 

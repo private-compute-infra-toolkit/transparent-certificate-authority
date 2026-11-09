@@ -25,7 +25,3 @@ style-guide.md
 
 .gemini
 .eclipse
-
-# Terraform state and configuration files
-operator/aws/.terraform*/
-operator/aws/terraform.tfstate

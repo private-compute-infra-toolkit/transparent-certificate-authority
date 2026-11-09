@@ -19,14 +19,14 @@ package com.google.mbs.domain;
 import java.util.Objects;
 
 /**
- * Configuration properties for the certificates configuration bucket.
+ * A {@link SelfSignedBundle} together with the {@link CertificatesConfig} epoch it belongs to.
  *
- * @param bucketName Name of the bucket hosting the rotations configuration.
- * @param configFileName File key / name of the rotations textproto within the bucket.
+ * @param epochId epoch of the self-signed certificate in {@link CertificatesConfig}
+ * @param bundle the self-signed bundle of that epoch
  */
-public record CertificatesConfigBucketProperties(String bucketName, String configFileName) {
-  public CertificatesConfigBucketProperties {
-    Objects.requireNonNull(bucketName);
-    Objects.requireNonNull(configFileName);
+public record SelfSignedBundleWithEpoch(int epochId, SelfSignedBundle bundle) {
+
+  public SelfSignedBundleWithEpoch {
+    Objects.requireNonNull(bundle);
   }
 }

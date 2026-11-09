@@ -18,6 +18,7 @@ package com.google.tca.adapters;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.mbs.domain.CrossSignedCertificateId;
 import com.google.mbs.domain.Metrics.ConfigEvent;
 import com.google.mbs.domain.Metrics.GenerationEvent;
 import com.google.mbs.domain.Metrics.LoadEvent;
@@ -26,10 +27,16 @@ import com.google.tca.domain.metric.IssuanceSubOperation;
 import com.google.tca.domain.metric.JwksCacheResult;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.domain.metric.Status;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -217,8 +224,7 @@ public class SystemMetricsTest {
 
     systemMetrics.setRootCertificateValidity(Duration.ofMinutes(5));
 
-    io.micrometer.core.instrument.Gauge gauge =
-        registry.get("tca.root_certificate_validity_seconds").gauge();
+    Gauge gauge = registry.get("tca.root_certificate_validity_seconds").gauge();
     assertThat(gauge).isNotNull();
     assertThat(gauge.value()).isEqualTo(300.0);
 
@@ -333,5 +339,70 @@ public class SystemMetricsTest {
     assertThat(prometheusScrape).contains("tca_mbsLoadStatus{status=\"backup_not_found\"} 1.0");
     assertThat(prometheusScrape)
         .contains("tca_mbsConfigStatus{status=\"invalid_configuration_file\"} 1.0");
+  }
+
+  @Test
+  public void recordActiveSelfSignedCertificates_reportsOnlyMostRecentValues() {
+    String metric = "tca.mbsActiveSelfSignedCertificate";
+
+    systemMetrics.recordActiveSelfSignedCertificates(Set.of(0, 1));
+    assertThat(activeEpochGauges(metric)).containsExactly("0", 1.0, "1", 1.0);
+
+    systemMetrics.recordActiveSelfSignedCertificates(Set.of(1, 2));
+    assertThat(activeEpochGauges(metric)).containsExactly("1", 1.0, "2", 1.0);
+  }
+
+  @Test
+  public void recordActiveCrossSignedCertificates_reportsOnlyMostRecentValues() {
+    String metric = "tca.mbsActiveCrossSignedCertificate";
+    CrossSignedCertificateId cert01 = new CrossSignedCertificateId(0, 1);
+    CrossSignedCertificateId cert10 = new CrossSignedCertificateId(1, 0);
+    CrossSignedCertificateId cert12 = new CrossSignedCertificateId(1, 2);
+
+    systemMetrics.recordActiveCrossSignedCertificates(Set.of(cert01, cert10));
+    assertThat(activeEpochGauges(metric)).containsExactly("0_1", 1.0, "1_0", 1.0);
+
+    systemMetrics.recordActiveCrossSignedCertificates(Set.of(cert10, cert12));
+    assertThat(activeEpochGauges(metric)).containsExactly("1_0", 1.0, "1_2", 1.0);
+  }
+
+  @Test
+  public void recordActiveSelfSignedCertificates_capsLifetimeTagCount() {
+    int retired = SystemMetrics.MAX_ACTIVE_CERTIFICATE_TAGS - 10;
+    systemMetrics.recordActiveSelfSignedCertificates(epochs(0, retired));
+
+    systemMetrics.recordActiveSelfSignedCertificates(epochs(retired, retired + 50));
+
+    Map<String, Double> active = activeEpochGauges("tca.mbsActiveSelfSignedCertificate");
+    assertThat(active).hasSize(10);
+    assertThat(active.values()).containsExactlyElementsIn(Collections.nCopies(10, 1.0));
+  }
+
+  @Test
+  public void recordActiveCrossSignedCertificates_capsLifetimeTagCount() {
+    int retired = SystemMetrics.MAX_ACTIVE_CERTIFICATE_TAGS - 10;
+    systemMetrics.recordActiveCrossSignedCertificates(crossSignedCerts(0, retired));
+
+    systemMetrics.recordActiveCrossSignedCertificates(crossSignedCerts(retired, retired + 50));
+
+    Map<String, Double> active = activeEpochGauges("tca.mbsActiveCrossSignedCertificate");
+    assertThat(active).hasSize(10);
+    assertThat(active.values()).containsExactlyElementsIn(Collections.nCopies(10, 1.0));
+  }
+
+  private static Set<Integer> epochs(int startInclusive, int endExclusive) {
+    return IntStream.range(startInclusive, endExclusive).boxed().collect(Collectors.toSet());
+  }
+
+  private static Set<CrossSignedCertificateId> crossSignedCerts(
+      int startInclusive, int endExclusive) {
+    return IntStream.range(startInclusive, endExclusive)
+        .mapToObj(i -> new CrossSignedCertificateId(0, i + 1))
+        .collect(Collectors.toSet());
+  }
+
+  private Map<String, Double> activeEpochGauges(String metricName) {
+    return registry.find(metricName).gauges().stream()
+        .collect(Collectors.toMap(g -> g.getId().getTag("epoch"), Gauge::value));
   }
 }

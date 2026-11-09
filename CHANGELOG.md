@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.14.0 (2026-11-09)
+
+
+### Features
+
+* cap active certificate MultiGauge tag cardinality
+* update MBS submodule to 0.14.0 and support new MBS metrics
+
 ## 0.13.0 (2026-10-30)
 
 

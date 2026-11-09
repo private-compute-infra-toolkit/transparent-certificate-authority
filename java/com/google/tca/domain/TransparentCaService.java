@@ -116,7 +116,7 @@ public class TransparentCaService {
     }
 
     TrustPackage trustPackage = trustPackageProvider.getActiveTrustPackage();
-    SelfSignedBundle rootBundle = trustPackage.selfSignedBundles().get(0);
+    SelfSignedBundle rootBundle = trustPackage.selfSignedBundles().get(0).bundle();
     X509Certificate rootCertificate = rootBundle.certificate();
     PrivateKey privateKey = rootBundle.privateKey();
     String trustDomain;

@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedBundleWithEpoch;
 import com.google.mbs.domain.TrustPackage;
 import com.google.mbs.domain.TrustPackageProvider;
 import com.google.tca.domain.TimeProvider;
@@ -60,8 +61,12 @@ public class CertificateValidityReporterTest {
         () ->
             new TrustPackage(
                 List.of(
-                    new SelfSignedBundle(
-                        mockCertificate, mockPrivateKey, AttestationToken.fromBytes(new byte[0]))),
+                    new SelfSignedBundleWithEpoch(
+                        0,
+                        new SelfSignedBundle(
+                            mockCertificate,
+                            mockPrivateKey,
+                            AttestationToken.fromBytes(new byte[0])))),
                 List.of());
     reporter = new CertificateValidityReporter(certificateProvider, mockMetrics, mockTimeProvider);
   }

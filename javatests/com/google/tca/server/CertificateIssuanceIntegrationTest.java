@@ -27,10 +27,12 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.util.Modules;
-import com.google.mbs.MbsCertificateFactory;
+import com.google.mbs.adapters.DefaultSelfSignedCertificateFactory;
 import com.google.mbs.domain.AttestationToken;
 import com.google.mbs.domain.SelfSignedBundle;
+import com.google.mbs.domain.SelfSignedBundleWithEpoch;
 import com.google.mbs.domain.SelfSignedCertificate;
+import com.google.mbs.domain.SelfSignedCertificateFactory;
 import com.google.mbs.domain.TrustPackage;
 import com.google.mbs.domain.TrustPackageProvider;
 import com.google.mbs.domain.ValidityPeriod;
@@ -145,9 +147,10 @@ public class CertificateIssuanceIntegrationTest {
     }
 
     Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
-    MbsCertificateFactory.X509CertificateAndPrivateKey certAndKey =
-        MbsCertificateFactory.createSelfSignedCertificatesFactory(
-                new MbsCertificateFactory.CertSignatureSpec("RSA", 4096, "SHA256withRSA"),
+    SelfSignedCertificateFactory.X509CertificateAndPrivateKey certAndKey =
+        new DefaultSelfSignedCertificateFactory(
+                new DefaultSelfSignedCertificateFactory.CertSignatureSpec(
+                    "RSA", 4096, "SHA256withRSA"),
                 new X500Name("CN=TCA"),
                 Optional.of(
                     new GeneralNames(
@@ -162,7 +165,9 @@ public class CertificateIssuanceIntegrationTest {
     final SelfSignedBundle selfSignedBundle =
         new SelfSignedBundle(certAndKey.certificate(), certAndKey.privateKey(), dummyToken);
     activeTrustPackage =
-        new AtomicReference<>(new TrustPackage(List.of(selfSignedBundle), List.of()));
+        new AtomicReference<>(
+            new TrustPackage(
+                List.of(new SelfSignedBundleWithEpoch(0, selfSignedBundle)), List.of()));
 
     KeyPair jwtKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
     this.jwtPrivateKey = jwtKeyPair.getPrivate();
@@ -432,16 +437,18 @@ public class CertificateIssuanceIntegrationTest {
     Instant certStart = Instant.parse("2026-01-01T00:00:00Z");
     ValidityPeriod validity = new ValidityPeriod(certStart, certStart.plus(Duration.ofDays(30)));
     X509Certificate crossCert1 =
-        MbsCertificateFactory.createSelfSignedCertificatesFactory(
-                new MbsCertificateFactory.CertSignatureSpec("EC", 256, "SHA256withECDSA"),
+        new DefaultSelfSignedCertificateFactory(
+                new DefaultSelfSignedCertificateFactory.CertSignatureSpec(
+                    "EC", 256, "SHA256withECDSA"),
                 new X500Name("CN=TCA Cross 1"),
                 Optional.empty(),
                 KeyUsage.keyCertSign)
             .generate(new SelfSignedCertificate(2, validity))
             .certificate();
     X509Certificate crossCert2 =
-        MbsCertificateFactory.createSelfSignedCertificatesFactory(
-                new MbsCertificateFactory.CertSignatureSpec("EC", 256, "SHA256withECDSA"),
+        new DefaultSelfSignedCertificateFactory(
+                new DefaultSelfSignedCertificateFactory.CertSignatureSpec(
+                    "EC", 256, "SHA256withECDSA"),
                 new X500Name("CN=TCA Cross 2"),
                 Optional.empty(),
                 KeyUsage.keyCertSign)
@@ -485,6 +492,7 @@ public class CertificateIssuanceIntegrationTest {
             .getActiveTrustPackage()
             .selfSignedBundles()
             .get(0)
+            .bundle()
             .certificate();
 
     assertThat(certChain).hasSize(4);
@@ -595,6 +603,7 @@ public class CertificateIssuanceIntegrationTest {
             .getActiveTrustPackage()
             .selfSignedBundles()
             .get(0)
+            .bundle()
             .certificate();
 
     X509Certificate responseRootCert =
