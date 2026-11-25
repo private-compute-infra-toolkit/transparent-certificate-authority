@@ -36,6 +36,7 @@ import com.google.mbs.domain.TrustPackageProvider;
 import com.google.mbs.domain.ValidityPeriod;
 import com.google.tca.adapters.PolicyBucket;
 import com.google.tca.domain.TimeProvider;
+import com.google.tca.domain.TransparentCaService;
 import com.google.tca.domain.metric.Metrics;
 import com.google.tca.domain.metric.ProcessingStatus;
 import com.google.tca.v1.IssueCertificateRequest;
@@ -357,7 +358,8 @@ public class FullIntegrationTest {
     assertEquals("CN=test", signedCert.getSubjectX500Principal().getName());
 
     // Verify certificate validity
-    assertThat(signedCert.getNotBefore().toInstant()).isEqualTo(testTime);
+    assertThat(signedCert.getNotBefore().toInstant())
+        .isEqualTo(testTime.minus(TransparentCaService.CLOCK_SKEW_TOLERANCE));
     assertThat(signedCert.getNotAfter().toInstant()).isEqualTo(testTime.plusSeconds(3600));
 
     String expectedSpiffeId =

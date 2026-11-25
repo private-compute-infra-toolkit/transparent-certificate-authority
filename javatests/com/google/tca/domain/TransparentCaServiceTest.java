@@ -199,6 +199,82 @@ public class TransparentCaServiceTest {
   }
 
   @Test
+  public void issueCertificate_validRequest_backdatesNotBeforeByClockSkewTolerance()
+      throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    byte[] csrBytes = createTestCsr(keyPair).getEncoded();
+    CertificateIssuanceRequest request = createValidRequest(csrBytes);
+    stubSuccessfulIssuance(keyPair, csrBytes);
+    // Endorsement window is wide enough that it does not clamp the certificate validity.
+    when(mockEndorsementMetadataProvider.getValidity(any()))
+        .thenReturn(
+            new Validity(testTime.minus(Duration.ofDays(1)), testTime.plus(Duration.ofDays(1))));
+
+    transparentCaService.issueCertificate(request, createIdentityWithBinding(keyPair.getPublic()));
+
+    // notBefore is backdated for skew tolerance; notAfter is still anchored on the real "now".
+    verify(mockCertificateSigner)
+        .signCsr(
+            aryEq(csrBytes),
+            eq(mockRootCertificate),
+            eq(mockPrivateKey),
+            eq(testTime.minus(TransparentCaService.CLOCK_SKEW_TOLERANCE)),
+            eq(testTime.plus(Duration.ofHours(1))),
+            any(),
+            any());
+  }
+
+  @Test
+  public void issueCertificate_endorsementNotBeforeAfterBackdatedStart_clampsNotBefore()
+      throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+    byte[] csrBytes = createTestCsr(keyPair).getEncoded();
+    CertificateIssuanceRequest request = createValidRequest(csrBytes);
+    stubSuccessfulIssuance(keyPair, csrBytes);
+    // Endorsement became valid 10s ago, i.e. after (now - CLOCK_SKEW_TOLERANCE).
+    Instant endorsementNotBefore = testTime.minusSeconds(10);
+    when(mockEndorsementMetadataProvider.getValidity(any()))
+        .thenReturn(new Validity(endorsementNotBefore, testTime.plus(Duration.ofDays(1))));
+
+    transparentCaService.issueCertificate(request, createIdentityWithBinding(keyPair.getPublic()));
+
+    verify(mockCertificateSigner)
+        .signCsr(
+            aryEq(csrBytes),
+            eq(mockRootCertificate),
+            eq(mockPrivateKey),
+            eq(endorsementNotBefore),
+            eq(testTime.plus(Duration.ofHours(1))),
+            any(),
+            any());
+  }
+
+  private void stubSuccessfulIssuance(KeyPair keyPair, byte[] csrBytes) throws Exception {
+    when(mockVerifierProvider.getVerifier(any(AttestationEvidence.class)))
+        .thenReturn(Optional.of(mockAttestationVerifier));
+    when(mockAttestationVerifier.verify(
+            any(AttestationEvidence.class), any(PublicKey.class), any(ReferenceValues.class)))
+        .thenReturn(true);
+    when(mockKeyDecoder.decodeRawPublicKey(any())).thenReturn(keyPair.getPublic());
+    when(mockPolicyProvider.getPolicy(any(), any(), any()))
+        .thenReturn(Optional.of(createValidPolicy()));
+    when(mockEndorsementMetadataProvider.getAnnotations(any()))
+        .thenReturn(createValidEndorsementProperties());
+    when(mockkAttestationEvidence.getReferenceValuesType()).thenReturn(ReferenceValuesType.GCP);
+    when(mockTimeProvider.now()).thenReturn(testTime);
+    when(mockCertificateModifiersCreator.create(any(), any())).thenReturn(List.of());
+    when(mockCertificateSigner.signCsr(
+            aryEq(csrBytes),
+            eq(mockRootCertificate),
+            eq(mockPrivateKey),
+            any(),
+            any(),
+            any(),
+            any()))
+        .thenReturn(mockChildCertificate);
+  }
+
+  @Test
   public void issueCertificate_mismatchedAudienceBinding_succeedsButLogsError() throws Exception {
     KeyPair keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
     KeyPair differentKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();

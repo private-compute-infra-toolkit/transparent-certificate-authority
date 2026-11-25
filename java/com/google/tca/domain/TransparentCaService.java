@@ -53,6 +53,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,12 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 public class TransparentCaService {
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+
+  /**
+   * How far into the past the {@code notBefore} of an issued certificate is set, relative to the
+   * TCA's clock, to tolerate clock skew between the TCA and relying parties.
+   */
+  public static final Duration CLOCK_SKEW_TOLERANCE = Duration.ofMinutes(5);
 
   private final TrustPackageProvider trustPackageProvider;
   private final AttestationVerifierProvider verifierProvider;
@@ -175,11 +182,14 @@ public class TransparentCaService {
       throw new IllegalArgumentException("Attestation token is not valid");
     }
 
-    // Determine certificate validity
+    // Determine certificate validity. The start is backdated by CLOCK_SKEW_TOLERANCE so that a
+    // relying party whose clock is slightly behind the TCA's does not reject a freshly issued
+    // certificate as "not yet valid". The end is still computed from the real issuance time, so
+    // the backdate never extends the certificate lifetime beyond the policy maximum.
     Instant now = timeProvider.now();
     Instant expiration = now.plus(policy.certificateAttributes().maxCertificateValidity());
     Instant certificateValidityEnd = min(expiration, validity.notAfter());
-    Instant certificateValidityStart = max(now, validity.notBefore());
+    Instant certificateValidityStart = max(now.minus(CLOCK_SKEW_TOLERANCE), validity.notBefore());
 
     if (certificateValidityStart.isAfter(certificateValidityEnd)) {
       metrics.incrementProcessingCounter(INCORRECT_CERTIFICATE_VALIDITY);

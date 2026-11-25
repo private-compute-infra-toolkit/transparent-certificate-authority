@@ -41,6 +41,7 @@ import com.google.oak.attestation.v1.Evidence;
 import com.google.protobuf.ByteString;
 import com.google.tca.domain.FileFetcher;
 import com.google.tca.domain.TimeProvider;
+import com.google.tca.domain.TransparentCaService;
 import com.google.tca.domain.attestation.AttestationEvidence;
 import com.google.tca.domain.attestation.AttestationVerifier;
 import com.google.tca.domain.attestation.AttestationVerifierProvider;
@@ -504,7 +505,8 @@ public class CertificateIssuanceIntegrationTest {
     assertEquals("CN=test", signedCert.getSubjectX500Principal().getName());
 
     // Verify certificate validity
-    assertThat(signedCert.getNotBefore().toInstant()).isEqualTo(testTime);
+    assertThat(signedCert.getNotBefore().toInstant())
+        .isEqualTo(testTime.minus(TransparentCaService.CLOCK_SKEW_TOLERANCE));
     assertThat(signedCert.getNotAfter().toInstant()).isEqualTo(testTime.plusSeconds(3600));
 
     // Verify the SAN extension
@@ -616,7 +618,8 @@ public class CertificateIssuanceIntegrationTest {
     assertEquals("CN=test", signedCert.getSubjectX500Principal().getName());
 
     // Verify certificate validity
-    assertThat(signedCert.getNotBefore().toInstant()).isEqualTo(testTime);
+    assertThat(signedCert.getNotBefore().toInstant())
+        .isEqualTo(testTime.minus(TransparentCaService.CLOCK_SKEW_TOLERANCE));
     assertThat(signedCert.getNotAfter().toInstant()).isEqualTo(testTime.plusSeconds(3600));
 
     // Verify the SAN extension
